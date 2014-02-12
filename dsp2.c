@@ -9,6 +9,15 @@
 
 #define DATA_LEN	352*288
 
+#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+
+struct Centroid
+{
+	float x;
+	float y;
+	int size;
+};
+
 GLuint texture[2];
 unsigned char buffer[DATA_LEN];
 unsigned char pixels[DATA_LEN * 4];
@@ -48,16 +57,89 @@ void erode_cross(unsigned char *data, int width, int height){
 	memcpy(data, new_data, width*height);
 }
 
-float* get_centroids(unsigned char* data, int width, int height){
+struct Centroid* get_centroids(unsigned char* data, int width, int height){
 	int prev_val = 0;
-	static float centroids[20];
+	int cent_index = 1;
+	int new_index[255];
+	static struct Centroid centroids[255];
+	for (int i = 0; i < 255; ++i)
+	{
+		new_index[i] = i;
+		centroids[i].x = 0;
+		centroids[i].y = 0;
+		centroids[i].size = 0;
+	}
+	//first pass, find pixel groups
 	for (int y = 1; y < height; ++y)
 	{
-		for (int x = 1; x < width; ++x)
+		for (int x = 1; x < width - 1; ++x)
 		{
-			
+			if (data[width*(y)+(x)] != prev_val)
+			{
+				//THIS IS WHAT HAPPENS WHEN WORLDS COLLIDE!!!
+				if (data[width*(y-1)+(x)] > 0 && data[width*(y)+(x-1)] > 0 && 
+					data[width*(y-1)+(x)] != data[width*(y)+(x-1)])
+				{
+					//store lowest value
+					if(new_index[data[width*(y)+(x-1)]] < new_index[data[width*(y-1)+(x)]]){
+						new_index[data[width*(y-1)+(x)]] = new_index[data[width*(y)+(x-1)]];
+					}else{
+						new_index[data[width*(y)+(x-1)]] = new_index[data[width*(y-1)+(x)]];
+					}
+				}
+				//pixel mass above
+				if (data[width*(y-1)+(x)] > 0)
+				{
+					data[width*(y)+(x)] = new_index[data[width*(y-1)+(x)]];
+				}
+				else if (data[width*(y)+(x)] > 0)
+				{
+					//check previous pixel for pixel mass
+					if (prev_val > 0)
+					{
+						data[width*(y)+(x)] = new_index[prev_val];
+					}
+					//beginning of pixel mass
+					else
+					{
+						data[width*(y)+(x)] = new_index[cent_index];
+					}
+				}
+				//end of pixel mass
+				else
+				{
+					cent_index++;
+				}
+			}
+			prev_val = data[width*(y)+(x)];
 		}
 	}
+	//second pass, calc centroids
+	int val = 0;
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			val = width*y+x;
+			data[val] = new_index[data[val]];
+			if (data[val] > 0)
+			{
+				centroids[data[val]].x += x;
+				centroids[data[val]].y += y;
+				centroids[data[val]].size++;
+			}
+		}
+	}
+	//normalize centroids
+	for (int i = 0; i < 255; ++i)
+	{
+		if (centroids[i].size > 0)
+		{
+			centroids[i].x /= centroids[i].size;
+			centroids[i].y /= centroids[i].size;
+		}
+	}
+	//TODO: sort the centroids
 	return centroids;
 }
 
@@ -75,14 +157,74 @@ void perform_DSP(){
 	//erode_cross(buffer, 352, 288);
 	//erode_cross(buffer, 352, 288);
 	//calculate centroids
-	get_centroids(buffer, 352, 288);
+	struct Centroid *centroids = get_centroids(buffer, 352, 288);
 	//load data into pixels as greyscale
 	for (int i = 0; i < DATA_LEN; ++i)
     {
-    	pixels2[i*4+0] = buffer[i];
-		pixels2[i*4+1] = buffer[i];
-		pixels2[i*4+2] = buffer[i];
+    	/*if (buffer[i] == 0)
+    	{
+    		pixels2[i*4+0] = 0;
+			pixels2[i*4+1] = 0;
+			pixels2[i*4+2] = 0;
+    	}else if (buffer[i] == 1)
+    	{
+    		pixels2[i*4+0] = 100;
+			pixels2[i*4+1] = 50;
+			pixels2[i*4+2] = 50;
+    	}else if (buffer[i] == 2)
+    	{
+    		pixels2[i*4+0] = 50;
+			pixels2[i*4+1] = 100;
+			pixels2[i*4+2] = 50;
+    	}
+    	else if (buffer[i] == 3)
+    	{
+    		pixels2[i*4+0] = 50;
+			pixels2[i*4+1] = 50;
+			pixels2[i*4+2] = 100;
+    	}
+    	else if (buffer[i] == 4)
+    	{
+    		pixels2[i*4+0] = 100;
+			pixels2[i*4+1] = 100;
+			pixels2[i*4+2] = 50;
+    	}
+    	else if (buffer[i] == 5)
+    	{
+    		pixels2[i*4+0] = 50;
+			pixels2[i*4+1] = 100;
+			pixels2[i*4+2] = 100;
+    	}
+    	else if (buffer[i] > 6)
+    	{
+    		pixels2[i*4+0] = 100;
+			pixels2[i*4+1] = 100;
+			pixels2[i*4+2] = 100;
+    	}*/
+		if (buffer[i] > 0)
+		{
+			pixels2[i*4+0] = buffer[i] * 7;
+			pixels2[i*4+1] = 10;
+			pixels2[i*4+2] = 255;
+		}else{
+			pixels2[i*4+0] = 0;
+			pixels2[i*4+1] = 0;
+			pixels2[i*4+2] = 0;
+		}
 		pixels2[i*4+3] = 255;
+    }
+    for (int i = 0; i < 255; ++i)
+    {
+    	//if decently size, draw as a red pixel
+    	if (centroids[i].size > 20)
+    	{
+    		//printf("cent: %f %f\n", centroids[i].y, centroids[i].x);
+    		int val = (int)(352*centroids[i].y+centroids[i].x);
+    		pixels2[val*4+0] = 255;
+			pixels2[val*4+1] = 0;
+			pixels2[val*4+2] = 0;
+			pixels2[val*4+3] = 255;
+    	}
     }
 }
 
