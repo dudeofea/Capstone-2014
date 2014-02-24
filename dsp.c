@@ -1,3 +1,10 @@
+/*
+*	Digital Signal Processing Functions
+*	These functions accept an 8bpp image which is either
+*	Thresholded or manipulated as a binary image.
+*	
+*	See cluster.png to see an example of centroid calculation
+*/
 #include "dsp.h"
 
 //Create a binary image by thresholding
