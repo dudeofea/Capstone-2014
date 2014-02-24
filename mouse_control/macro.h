@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <libusb.h>
 #include <unistd.h>
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h>
+#include <X11/extensions/XTest.h>
 
 #define PS2_VENDOR_ID		0x0810
 #define PS2_PRODUCT_ID		0x0001
@@ -16,6 +21,14 @@
 #define SQUARE_BUTTON		0x800000
 #define TRIANGLE_BUTTON		0x100000
 #define CIRCLE_BUTTON		0x200000
+#define L1_BUTTON			0x400
+#define L2_BUTTON			0x100
+#define L3_BUTTON			0x4000
+#define R1_BUTTON			0x800
+#define R2_BUTTON			0x200
+#define R3_BUTTON			0x8000
+#define START_BUTTON		0x2000
+#define	SELECT_BUTTON		0x1000
 
 #define bool char
 #define false				0

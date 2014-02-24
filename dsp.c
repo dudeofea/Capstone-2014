@@ -35,6 +35,9 @@ void erode_cross(unsigned char *data, int width, int height){
 	memcpy(data, new_data, width*height);
 }
 
+/*
+* Pass in a binary array of pixel data and receive an array of centroids
+*/
 struct Centroid* get_centroids(unsigned char* data, int width, int height){
 	int prev_val = 0;
 	int cent_index = 1;
@@ -61,7 +64,6 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 					if (prev_val > 0)
 					{
 						if (data[width*(y-1)+(x)] > 0){
-							//printf("(%d, %d) COLLIDE 2\n", x, y);
 							//fix past values
 							for (int i = x; i >= 0; i--)
 							{
