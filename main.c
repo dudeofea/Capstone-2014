@@ -1,3 +1,13 @@
+/*
+*	Captures RAW Bayer Format Data from an IR USB Camera
+*	And applies clusting/centroid calc to pixels to find
+*	center positions of "finger blobs"
+*
+*	This will be modified to run on the DE2
+*
+*	type make to build, ./dsp to run
+*	This was developed on Ubuntu 13.10
+*/
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -72,6 +82,7 @@ void perform_DSP(){
     }
 }
 
+//Recreate textures
 void setup_textures(){
 	glGenTextures(1, &texture[0]);
 	glBindTexture(GL_TEXTURE_2D, texture[0]);
@@ -91,10 +102,12 @@ void setup_textures(){
 	glEnable(GL_TEXTURE_2D);
 }
 
+//GLFW Window Error Callback function
 void error_callback(int error, const char* description)
 {
     fputs(description, stderr);
 }
+//GLFW Callback for close button on window
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -103,6 +116,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
 int main(int argc, char const *argv[])
 {
+	//Init GLFW
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
 	glfwSetErrorCallback(error_callback);
@@ -113,7 +127,10 @@ int main(int argc, char const *argv[])
 	    exit(EXIT_FAILURE);
 	}
 	glfwMakeContextCurrent(window);
+
+	//Open IR Camera
 	fp = open("/dev/video1", O_RDONLY);
+
 	glfwSetKeyCallback(window, key_callback);
 	while (!glfwWindowShouldClose(window))
 	{
@@ -134,6 +151,7 @@ int main(int argc, char const *argv[])
         copy_to_pixels();
         setup_textures();
 
+        //Draw Raw Camera Data
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, texture[0]);
         glBegin(GL_QUADS);
@@ -143,6 +161,7 @@ int main(int argc, char const *argv[])
 			glTexCoord2f(0.0f, 1.0f); glVertex3f(-ratio, -1.0f, 0.0);
 		glEnd();
 
+		//Draw Processed Data
 		glBindTexture(GL_TEXTURE_2D, texture[1]);
 		glBegin(GL_QUADS);
 			glTexCoord2f(0.0f, 0.0f); glVertex3f( 0.0f, 1.0f, 0.0f);
