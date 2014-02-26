@@ -211,6 +211,29 @@ void test_centroid7(void)
    CU_ASSERT(centroids_equal(cents, ans, 2));
 }
 
+/*
+*  Tests to make sure centroids are returned correctly
+*/
+void test_centroid8(void)
+{
+   unsigned char pixels[6*6] = {
+         0, 0, 0, 0, 0, 0,
+         0, 1, 1, 0, 1, 1,
+         0, 1, 0, 0, 0, 1,
+         0, 1, 1, 0, 0, 1,
+         0, 0, 0, 0, 0, 1,
+         0, 1, 0, 0, 1, 1,
+   };
+
+   struct Centroid ans[3];
+   ans[0] = (struct Centroid){1.4f, 2.0f, 5};
+   ans[1] = (struct Centroid){33.0f / 7.0f, 3.0f, 7};
+   ans[2] = (struct Centroid){1.0f, 5.0f, 1};
+
+   struct Centroid* cents = get_centroids(pixels, 6, 6);
+   CU_ASSERT(centroids_equal(cents, ans, 3));
+}
+
 /* The main() function for setting up and running the tests.
  * Returns a CUE_SUCCESS on successful running, another
  * CUnit error code on failure.
@@ -239,6 +262,7 @@ int main()
    CU_add_test(pSuite, "test centroid calculation 2", test_centroid5);
    CU_add_test(pSuite, "test centroid calculation 3", test_centroid6);
    CU_add_test(pSuite, "test centroid calculation 4", test_centroid7);
+   CU_add_test(pSuite, "test centroid placement in array 1", test_centroid8);
 
    /* Run all tests using the CUnit Basic interface */
    CU_basic_set_mode(CU_BRM_VERBOSE);
