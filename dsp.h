@@ -1,4 +1,9 @@
 /*
+*	© Copyright 2014, Group 4, ECE 492
+*
+*	This code was created through the collaboration
+*	of Alix Krahn, Denis Lachance and Adam Thomson. 
+*
 *	Digital Signal Processing Functions
 *	These functions accept an 8bpp image which is either
 *	Thresholded or manipulated as a binary image.

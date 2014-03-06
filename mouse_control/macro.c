@@ -1,3 +1,18 @@
+/*
+*	© Copyright 2014, Group 4, ECE 492
+*
+*	This code was created through the collaboration
+*	of Alix Krahn, Denis Lachance and Adam Thomson. 
+*
+*	Captures USB data from a Playstation 2 Controller
+*	and moves the mouse accordingly
+*
+*	This will be modified to run with the DE2 instead
+*	of a PS2 Controller, since both use USB.
+*
+*	type make to build, ./macro to run
+*	This was developed on Ubuntu 13.10
+*/
 #include "macro.h"
 
 //find the first quckcam express camera attached to usb

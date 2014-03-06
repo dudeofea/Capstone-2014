@@ -1,4 +1,12 @@
 /*
+*	© Copyright 2014, Group 4, ECE 492
+*
+*	This code was created through the collaboration
+*	of Alix Krahn, Denis Lachance and Adam Thomson. 
+*
+*	The Algorithms used originate from a base knowledge
+*	of ECE 440 and ECE 442
+*
 *	Captures RAW Bayer Format Data from an IR USB Camera
 *	And applies clusting/centroid calc to pixels to find
 *	center positions of "finger blobs"
@@ -18,7 +26,12 @@
 #include "dsp.h"
 
 #define DATA_LEN	352*288
+#define DATA_WIDTH	352
+#define DATA_HEIGHT	288
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+
+#define SHORT_MAX	255
+#define SHORT_MIN	0
 
 GLuint texture[2];
 unsigned char buffer[DATA_LEN];
@@ -33,35 +46,37 @@ void copy_to_pixels(){
 		pixels[i*4+0] = buffer[i];
 		pixels[i*4+1] = buffer[i];
 		pixels[i*4+2] = buffer[i];
-		pixels[i*4+3] = 255;
+		pixels[i*4+3] = SHORT_MAX;
     }
 }
 
 void perform_DSP(){
 	//Threshold image
-	threshold(buffer, 352, 288, 128);
+	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, SHORT_MAX / 2);
 
 	//perform morphological erosion (computer only)
 	//erode_cross(buffer, 352, 288);
 	//erode_cross(buffer, 352, 288);
 
 	//calculate centroids
-	struct Centroid *centroids = get_centroids(buffer, 352, 288);
+	struct Centroid *centroids = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
 
 	//load data into pixels as greyscale
 	for (int i = 0; i < DATA_LEN; ++i)
     {
 		if (buffer[i] > 0)
 		{
+			//blue
 			pixels2[i*4+0] = buffer[i] * 7;
 			pixels2[i*4+1] = 10;
-			pixels2[i*4+2] = 255;
+			pixels2[i*4+2] = SHORT_MAX;
 		}else{
+			//black
 			pixels2[i*4+0] = 0;
 			pixels2[i*4+1] = 0;
 			pixels2[i*4+2] = 0;
 		}
-		pixels2[i*4+3] = 255;
+		pixels2[i*4+3] = SHORT_MAX;
 		buffer[i] = 0;
     }
     if (centroids != NULL)
@@ -73,10 +88,10 @@ void perform_DSP(){
 			{
 				//printf("cent: %f %f\n", centroids[i].y, centroids[i].x);
 				int val = 352*(int)centroids[i].y+(int)centroids[i].x;
-				pixels2[val*4+0] = 255;
-				pixels2[val*4+1] = 0;
-				pixels2[val*4+2] = 0;
-				pixels2[val*4+3] = 255;
+				pixels2[val*4+0] = SHORT_MAX;
+				pixels2[val*4+1] = SHORT_MIN;
+				pixels2[val*4+2] = SHORT_MIN;
+				pixels2[val*4+3] = SHORT_MAX;
 			}
 		}
     }
@@ -88,7 +103,7 @@ void setup_textures(){
 	glBindTexture(GL_TEXTURE_2D, texture[0]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, 352, 288, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, DATA_WIDTH, DATA_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
 	glEnable(GL_TEXTURE_2D);
 
 	//perform DSP
@@ -98,7 +113,7 @@ void setup_textures(){
 	glBindTexture(GL_TEXTURE_2D, texture[1]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, 352, 288, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels2);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, DATA_WIDTH, DATA_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels2);
 	glEnable(GL_TEXTURE_2D);
 }
 
