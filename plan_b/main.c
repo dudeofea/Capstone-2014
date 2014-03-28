@@ -4,14 +4,10 @@
 *	This code was created through the collaboration
 *	of Alix Krahn, Denis Lachance and Adam Thomson. 
 *
-*	The Algorithms used originate from a base knowledge
-*	of ECE 440 and ECE 442
-*
 *	Captures RAW Bayer Format Data from an IR USB Camera
-*	And applies clusting/centroid calc to pixels to find
-*	center positions of "finger blobs"
-*
-*	This will be modified to run on the DE2
+*	and offloads onto DE2 board via sockets. The DE2 then
+*	returns a list of (up to 10) points which represent
+*	finger positions
 *
 *	type make to build, ./dsp to run
 *	This was developed on Ubuntu 13.10
@@ -23,36 +19,22 @@
 #include <string.h>
 #include <GLFW/glfw3.h>
 
-#include "dsp.h"
+#include "socket.h"
 
-#define DATA_LEN	352*288
-#define DATA_WIDTH	352
-#define DATA_HEIGHT	288
 #define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
 
 #define SHORT_MAX	255
 #define SHORT_MIN	0
 
-GLuint texture[2];
+/*GLuint texture[1];
 unsigned char buffer[DATA_LEN];
 unsigned char pixels[DATA_LEN * 4];
 unsigned char pixels2[DATA_LEN * 4];
-int fp;
+int fp;*/
 
-void copy_to_pixels(){
-    read(fp, buffer, DATA_LEN);
-    for (int i = 0; i < DATA_LEN; ++i)
-    {
-		pixels[i*4+0] = buffer[i];
-		pixels[i*4+1] = buffer[i];
-		pixels[i*4+2] = buffer[i];
-		pixels[i*4+3] = SHORT_MAX;
-    }
-}
-
-void perform_DSP(){
+/*void perform_DSP(){
 	//Threshold image
-	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, SHORT_MAX / 7);
+	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, SHORT_MAX / 4);
 
 	//perform morphological erosion (computer only)
 	//erode_cross(buffer, 352, 288);
@@ -127,11 +109,15 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
-}
+}*/
 
 int main(int argc, char const *argv[])
 {
-	//Init GLFW
+	de2_init();
+	while(1)
+		get_fingers();
+	de2_close();
+	/*//Init GLFW
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
 	glfwSetErrorCallback(error_callback);
@@ -194,5 +180,6 @@ int main(int argc, char const *argv[])
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
+	*/
 	return 0;
 }
