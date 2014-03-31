@@ -311,48 +311,52 @@ void test_quantize2(void)
 //Test encoding
 void test_zlc1(void)
 {
-   unsigned char pixels[10] = {
+   char pixels[10] = {
          0, 0, 0, 0, 0, 0, 0, 0, 1, 3
    };
 
-   unsigned char ans[10] = {
-         0, 0, 0, 8, 1, 3
+   char ans[10] = {
+         0, 0, 8, 1, 3
    };
 
    int len = zero_length_encode(pixels, 10);
-   CU_ASSERT(len == 6);
-   CU_ASSERT(pixels_equal(pixels, ans, len, 1));
+   CU_ASSERT(len == 5);
+   CU_ASSERT(pixels_equal((unsigned char*)pixels, (unsigned char*)ans, len, 1));
 }
 
 //Test decoding
 void test_zlc2(void){
-   unsigned char str[10] = {
-         0, 0, 0, 8, 1, 3
+   char str[10] = {
+         0, 0, 8, 1, 3
    };
 
    unsigned char ans[10] = {
-         0, 0, 0, 0, 0, 0, 0, 0, 1, 3
+         3, 3, 3, 3, 3, 3, 3, 3, 4, 6
    };
-   unsigned char pixels[10];
+   unsigned char pixels[10] = {
+         3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+   };
 
    zero_length_decode(str, pixels, 10);
    CU_ASSERT(pixels_equal(pixels, ans, 10, 1));
 }
 
-//Test codec
+//Test diff codec
 void test_zlc3(void){
-   unsigned char pixels[10] = {
+   char diff[10] = {
          0, 0, 3, 0, 0, 0, 0, 0, 1, 3
+   };
+   unsigned char end_pixels[10] = {
+         3, 3, 3, 3, 3, 3, 3, 3, 3, 3
    };
    unsigned char ans[10] = {
-         0, 0, 3, 0, 0, 0, 0, 0, 1, 3
+         3, 3, 6, 3, 3, 3, 3, 3, 4, 6
    };
-   unsigned char buf[10];
 
-   zero_length_encode(pixels, 10);
-   zero_length_decode(pixels, buf, 10);
+   zero_length_encode(diff, 10);
+   zero_length_decode(diff, end_pixels, 10);
 
-   CU_ASSERT(pixels_equal(buf, ans, 10, 1));
+   CU_ASSERT(pixels_equal(end_pixels, ans, 10, 1));
 }
 
 /* The main() function for setting up and running the tests.

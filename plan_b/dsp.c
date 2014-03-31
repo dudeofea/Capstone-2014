@@ -207,9 +207,9 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 }
 
 //Uses run-length coding to compress only the 0's.
-//Can handle up to 16581375 (2^24) 0's in a row
+//Can handle up to 2^16 0's in a row
 //returns: new length of buffer
-int zero_length_encode(unsigned char *data, int data_len){
+int zero_length_encode(char *data, int data_len){
 	//temp buffer to hold zlc pixels
 	unsigned char buffer[data_len];
 	int zero_length = 0;
@@ -227,8 +227,6 @@ int zero_length_encode(unsigned char *data, int data_len){
 				//a zero
 				buffer[buf_i++] = 0;
 				//highest byte
-				buffer[buf_i++] = (zero_length&0xFF0000)>>16;
-				//mid byte
 				buffer[buf_i++] = (zero_length&0x00FF00)>>8;
 				//lowest byte
 				buffer[buf_i++] = (zero_length&0x0000FF);
@@ -244,8 +242,8 @@ int zero_length_encode(unsigned char *data, int data_len){
 }
 
 //length must be known. Decompresses a zl coded
-//buffer into another data buffer.
-void zero_length_decode(unsigned char *buffer, unsigned char *data, int data_len){
+//diff buffer into another data buffer.
+void zero_length_decode(char *buffer, unsigned char *data, int data_len){
 	int buf_i = 0;
 	int zero_length = 0;
 	for (int i = 0; i < data_len; ++i)
@@ -254,16 +252,14 @@ void zero_length_decode(unsigned char *buffer, unsigned char *data, int data_len
 		{
 			//skip zero
 			buf_i++;
-			//get length from 3 bytes
-			zero_length |= (buffer[buf_i++]&0xFF)<<16;
+			//get length from 2 bytes
 			zero_length |= (buffer[buf_i++]&0xFF)<<8;
 			zero_length |= (buffer[buf_i++]&0xFF);
-			//set zeros
-			memset(data + i, 0, zero_length);
+			//increase index
 			i += zero_length - 1;
 			zero_length = 0;
 		}else{
-			data[i] = buffer[buf_i];
+			data[i] += buffer[buf_i];
 			buf_i++;
 		}
 	}
