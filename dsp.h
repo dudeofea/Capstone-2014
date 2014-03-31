@@ -28,8 +28,14 @@ struct Circle
 	float r;	//Radius
 };
 
+#define TOP		0
+#define RIGHT	1
+#define BOTTOM	2
+#define LEFT	3
+
 struct Circle get_circle(struct Centroid a, struct Centroid b, struct Centroid c);
 struct Centroid line_intersect(struct Centroid a1, struct Centroid a2, struct Centroid b1, struct Centroid b2);
 void erode_cross(unsigned char *data, int width, int height);
 struct Centroid* get_centroids(unsigned char* data, int width, int height);
 void threshold(unsigned char *data, int width, int height, int thresh);
+void clip_edges(unsigned char *data, int width, int height, int edge, int size);

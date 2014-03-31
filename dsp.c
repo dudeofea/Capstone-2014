@@ -76,6 +76,34 @@ void threshold(unsigned char *data, int width, int height, int thresh){
 	}
 }
 
+//clip an edge based on a size
+void clip_edges(unsigned char *data, int width, int height, int edge, int size){
+	switch(edge){
+		case TOP:
+			for (int i = 0; i < width*size; ++i)
+			{
+				data[i] = 0;
+			}
+			break;
+		case BOTTOM:
+			for (int i = width*(height - size); i < width*height; ++i)
+			{
+				data[i] = 0;
+			}
+			break;
+		case LEFT:
+			for (int y = 0; y < width*height; y += width)
+			{
+				for (int x = 0; x < size; ++x)
+				{
+					data[x+y] = 0;
+				}
+			}
+			break;
+		default: break;
+	}
+}
+
 //erode using a cross pattern matrix
 void erode_cross(unsigned char *data, int width, int height){
 	unsigned char new_data[width*height];

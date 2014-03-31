@@ -27,13 +27,14 @@ unsigned char buffer[DATA_LEN];
 unsigned int read_int(int filedes){
 	unsigned char buf[4] = {0,0,0,0};
 	int n = read(filedes, buf, 4*sizeof(char));
-	for (int i = 0; i < n; ++i)
-    {
-    	printf("%02x\n", buf[i]);
-    }
-	printf("N = %d\n", n);
 	unsigned int val = (0xFF&buf[0])<<24 | (0xFF&buf[1])<<16 | (0xFF&buf[2])<<8 | (0xFF&buf[3]);
 	return val;
+}
+
+struct Centroid read_cent(int filedes){
+	struct Centroid a;
+	int n = read(filedes, &a, sizeof(struct Centroid));
+	return a;
 }
 
 void write_int(int filedes, unsigned int val){
@@ -48,7 +49,7 @@ void write_int(int filedes, unsigned int val){
 
 int de2_init(){
 	//Open IR Camera
-	fp = open("/dev/video1", O_RDONLY);
+	fp = open("/dev/video0", O_RDONLY);
 	int n = 0;
     char recvBuff[1024];
     struct sockaddr_in serv_addr; 
@@ -105,10 +106,11 @@ Centroid* get_fingers(){
 		offset += CHUNK_LEN;
 	}
 	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, 0xFF / 4);
-	struct Centroid *cents = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
+	struct Centroid cents[10];// = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
 	for (int i = 0; i < 10; ++i)
 	{
-		printf("cent: %f, %f, %d\n", cents[i].x, cents[i].y, cents[i].size);
+		cents[i] = read_cent(sockfd);
+		printf("cent: %d, %d, %d\n", cents[i].x, cents[i].y, cents[i].size);
 	}
     //unsigned int a = read_int(sockfd);
     //printf("Int: %x\n", a); 

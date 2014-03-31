@@ -33,6 +33,12 @@
 #define SHORT_MAX	255
 #define SHORT_MIN	0
 
+struct pixel
+{
+	int r, g, b;
+	int x, y;
+};
+
 GLuint texture[2];
 unsigned char buffer[DATA_LEN];
 unsigned char pixels[DATA_LEN * 4];
@@ -50,10 +56,31 @@ void copy_to_pixels(){
     }
 }
 
+void draw_pixel(unsigned char *data, int width, int height, struct pixel p){
+	int val = width*p.y+p.x;
+	if (val < 0 || val >= width*height)
+		return;
+	data[val*4+0] = p.r;
+	data[val*4+1] = p.g;
+	data[val*4+2] = p.b;
+	data[val*4+3] = SHORT_MAX;
+}
+
+void draw_circle(unsigned char *data, int width, int height, struct pixel p){
+	int y0 = p.y, x0 = p.x;
+	for (int y = 0; y < 5; ++y){
+		p.y = y0 + y;
+		for (int x = 0; x < 5; ++x){
+			p.x = x0 + x;
+			draw_pixel(data, width, height, p);
+		}
+	}
+}
+
 void perform_DSP(){
 	//Threshold image
 	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, SHORT_MAX / 7);
-
+	clip_edges(buffer, DATA_WIDTH, DATA_HEIGHT, LEFT, 30);
 	//perform morphological erosion (computer only)
 	//erode_cross(buffer, 352, 288);
 	//erode_cross(buffer, 352, 288);
@@ -64,7 +91,7 @@ void perform_DSP(){
 	//load data into pixels as greyscale
 	for (int i = 0; i < DATA_LEN; ++i)
     {
-		if (buffer[i] > 0)
+		/*if (buffer[i] > 0)
 		{
 			//blue
 			pixels2[i*4+0] = buffer[i] * 7;
@@ -75,10 +102,11 @@ void perform_DSP(){
 			pixels2[i*4+0] = 0;
 			pixels2[i*4+1] = 0;
 			pixels2[i*4+2] = 0;
-		}
+		}*/
 		pixels2[i*4+3] = SHORT_MAX;
 		buffer[i] = 0;
     }
+    struct pixel white = {SHORT_MAX, SHORT_MIN, SHORT_MIN, 0, 0};
     if (centroids != NULL)
     {
     	for (int i = 0; i < 255; ++i)
@@ -87,11 +115,14 @@ void perform_DSP(){
 			if (centroids[i].size > 0)
 			{
 				//printf("cent: %f %f\n", centroids[i].y, centroids[i].x);
-				int val = 352*(int)centroids[i].y+(int)centroids[i].x;
-				pixels2[val*4+0] = SHORT_MAX;
-				pixels2[val*4+1] = SHORT_MAX;
-				pixels2[val*4+2] = SHORT_MAX;
-				pixels2[val*4+3] = SHORT_MAX;
+				//int val = 352*(int)centroids[i].y+(int)centroids[i].x;
+				white.x = centroids[i].x;
+				white.y = centroids[i].y;
+				draw_circle(pixels2, 352, 288, white);
+				//pixels2[val*4+0] = SHORT_MAX;
+				//pixels2[val*4+1] = SHORT_MAX;
+				//pixels2[val*4+2] = SHORT_MAX;
+				//pixels2[val*4+3] = SHORT_MAX;
 			}
 		}
     }
@@ -99,12 +130,12 @@ void perform_DSP(){
 
 //Recreate textures
 void setup_textures(){
-	glGenTextures(1, &texture[0]);
+	/*glGenTextures(1, &texture[0]);
 	glBindTexture(GL_TEXTURE_2D, texture[0]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, DATA_WIDTH, DATA_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
-	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_TEXTURE_2D);*/
 
 	//perform DSP
 	perform_DSP();
@@ -135,7 +166,7 @@ int main(int argc, char const *argv[])
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
 	glfwSetErrorCallback(error_callback);
-	GLFWwindow* window = glfwCreateWindow(640*2, 480, "Webcam DSP", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(640, 480, "Webcam DSP", NULL, NULL);
 	if (!window)
 	{
 	    glfwTerminate();
@@ -144,7 +175,7 @@ int main(int argc, char const *argv[])
 	glfwMakeContextCurrent(window);
 
 	//Open IR Camera
-	fp = open("/dev/video1", O_RDONLY);
+	fp = open("/dev/video0", O_RDONLY);
 
 	glfwSetKeyCallback(window, key_callback);
 	while (!glfwWindowShouldClose(window))
@@ -167,22 +198,22 @@ int main(int argc, char const *argv[])
         setup_textures();
 
         //Draw Raw Camera Data
-        glEnable(GL_TEXTURE_2D);
+        /*glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, texture[0]);
         glBegin(GL_QUADS);
 			glTexCoord2f(0.0f, 0.0f); glVertex3f(-ratio, 1.0f, 0.0f);
 			glTexCoord2f(1.0f, 0.0f); glVertex3f( 0.0f, 1.0f, 0.0);
 			glTexCoord2f(1.0f, 1.0f); glVertex3f( 0.0f,-1.0f, 0.0);
 			glTexCoord2f(0.0f, 1.0f); glVertex3f(-ratio, -1.0f, 0.0);
-		glEnd();
+		glEnd();*/
 
 		//Draw Processed Data
 		glBindTexture(GL_TEXTURE_2D, texture[1]);
 		glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f( 0.0f, 1.0f, 0.0f);
+			glTexCoord2f(0.0f, 0.0f); glVertex3f( -ratio, 1.0f, 0.0f);
 			glTexCoord2f(1.0f, 0.0f); glVertex3f( ratio, 1.0f, 0.0);
 			glTexCoord2f(1.0f, 1.0f); glVertex3f( ratio,-1.0f, 0.0);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f( 0.0f, -1.0f, 0.0);
+			glTexCoord2f(0.0f, 1.0f); glVertex3f( -ratio, -1.0f, 0.0);
 		glEnd();
 		glDisable(GL_TEXTURE_2D);
 

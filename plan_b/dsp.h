@@ -16,8 +16,8 @@
 
 struct Centroid
 {
-	float x;
-	float y;
+	int x;
+	int y;
 	int size;
 };
 
