@@ -26,14 +26,14 @@ unsigned char buffer[DATA_LEN];
 
 unsigned int read_int(int filedes){
 	unsigned char buf[4] = {0,0,0,0};
-	int n = read(filedes, buf, 4*sizeof(char));
+	read(filedes, buf, 4*sizeof(char));
 	unsigned int val = (0xFF&buf[0])<<24 | (0xFF&buf[1])<<16 | (0xFF&buf[2])<<8 | (0xFF&buf[3]);
 	return val;
 }
 
 struct Centroid read_cent(int filedes){
 	struct Centroid a;
-	int n = read(filedes, &a, sizeof(struct Centroid));
+	read(filedes, &a, sizeof(struct Centroid));
 	return a;
 }
 
@@ -106,10 +106,11 @@ Centroid* get_fingers(){
 		offset += CHUNK_LEN;
 	}
 	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, 0xFF / 4);
-	struct Centroid cents[10];// = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
+	struct Centroid *cents = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
 	for (int i = 0; i < 10; ++i)
 	{
-		cents[i] = read_cent(sockfd);
+		//cents[i] = 
+		read_cent(sockfd);
 		printf("cent: %d, %d, %d\n", cents[i].x, cents[i].y, cents[i].size);
 	}
     //unsigned int a = read_int(sockfd);

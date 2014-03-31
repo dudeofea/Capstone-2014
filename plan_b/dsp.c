@@ -117,7 +117,7 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 	int prev_val = 0;
 	int cent_index = SHORT_MIN + 1;
 	int new_index[SHORT_MAX];
-	static struct Centroid centroids[SHORT_MAX];
+	struct Centroid centroids[SHORT_MAX];
 	for (int i = 0; i < SHORT_MAX; ++i)
 	{
 		new_index[i] = i;
@@ -195,15 +195,19 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 		}
 	}
 	//normalize centroids
-	for (int i = 0; i < 255; ++i)
+	static struct Centroid fingers[10];
+	int finger_i = 0;
+	for (int i = 0; i < SHORT_MAX; ++i)
 	{
 		if (centroids[i].size > 0)
 		{
 			centroids[i].x /= centroids[i].size;
 			centroids[i].y /= centroids[i].size;
+			//add to return buffer
+			fingers[finger_i++] = centroids[i];
 		}
 	}
-	return centroids;
+	return fingers;
 }
 
 //Uses run-length coding to compress only the 0's.
