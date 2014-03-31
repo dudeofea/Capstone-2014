@@ -271,6 +271,90 @@ void test_circle1(void){
    CU_ASSERT(c.r == ans.r);
 }
 
+//Test downsampling
+void test_quantize1(void)
+{
+   unsigned char pixels[3*3] = {
+         19, 19, 1,
+         30, 45, 4,
+         102,20, 0,
+   };
+
+   unsigned char ans[3*3] = {
+         20, 20, 0,
+         40, 40, 0,
+         100,20, 0,
+   };
+
+   quantize(pixels, 3, 3, 20);
+   CU_ASSERT(pixels_equal(pixels, ans, 3, 3));
+}
+
+void test_quantize2(void)
+{
+   unsigned char pixels[3*3] = {
+         19, 19, 1,
+         30, 45, 4,
+         102,23, 0,
+   };
+
+   unsigned char ans[3*3] = {
+         20, 20, 0,
+         30, 45, 5,
+         100,25, 0,
+   };
+
+   quantize(pixels, 3, 3, 5);
+   CU_ASSERT(pixels_equal(pixels, ans, 3, 3));
+}
+
+//Test encoding
+void test_zlc1(void)
+{
+   unsigned char pixels[10] = {
+         0, 0, 0, 0, 0, 0, 0, 0, 1, 3
+   };
+
+   unsigned char ans[10] = {
+         0, 0, 0, 8, 1, 3
+   };
+
+   int len = zero_length_encode(pixels, 10);
+   CU_ASSERT(len == 6);
+   CU_ASSERT(pixels_equal(pixels, ans, len, 1));
+}
+
+//Test decoding
+void test_zlc2(void){
+   unsigned char str[10] = {
+         0, 0, 0, 8, 1, 3
+   };
+
+   unsigned char ans[10] = {
+         0, 0, 0, 0, 0, 0, 0, 0, 1, 3
+   };
+   unsigned char pixels[10];
+
+   zero_length_decode(str, pixels, 10);
+   CU_ASSERT(pixels_equal(pixels, ans, 10, 1));
+}
+
+//Test codec
+void test_zlc3(void){
+   unsigned char pixels[10] = {
+         0, 0, 3, 0, 0, 0, 0, 0, 1, 3
+   };
+   unsigned char ans[10] = {
+         0, 0, 3, 0, 0, 0, 0, 0, 1, 3
+   };
+   unsigned char buf[10];
+
+   zero_length_encode(pixels, 10);
+   zero_length_decode(pixels, buf, 10);
+
+   CU_ASSERT(pixels_equal(buf, ans, 10, 1));
+}
+
 /* The main() function for setting up and running the tests.
  * Returns a CUE_SUCCESS on successful running, another
  * CUnit error code on failure.
@@ -303,6 +387,12 @@ int main()
    //CU_add_test(pSuite, "test line intersection 1", test_line1);
    //CU_add_test(pSuite, "test line intersection 2", test_line2);
    //CU_add_test(pSuite, "test circle calculation 1", test_circle1);
+   CU_add_test(pSuite, "test pixel array quantization 1", test_quantize1);
+   CU_add_test(pSuite, "test pixel array quantization 2", test_quantize2);
+   CU_add_test(pSuite, "test pixel zero length encoding 1", test_zlc1);
+   CU_add_test(pSuite, "test pixel zero length encoding 2", test_zlc2);
+   CU_add_test(pSuite, "test pixel zero length encoding 3", test_zlc3);
+
 
    /* Run all tests using the CUnit Basic interface */
    CU_basic_set_mode(CU_BRM_VERBOSE);
