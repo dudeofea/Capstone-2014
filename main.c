@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <GLFW/glfw3.h>
+#include <pthread.h>
 
 #include "dsp.h"
 
@@ -44,17 +45,8 @@ unsigned char buffer[DATA_LEN];
 unsigned char pixels[DATA_LEN * 4];
 unsigned char pixels2[DATA_LEN * 4];
 int fp;
-
-void copy_to_pixels(){
-    read(fp, buffer, DATA_LEN);
-    for (int i = 0; i < DATA_LEN; ++i)
-    {
-		pixels[i*4+0] = buffer[i];
-		pixels[i*4+1] = buffer[i];
-		pixels[i*4+2] = buffer[i];
-		pixels[i*4+3] = SHORT_MAX;
-    }
-}
+int tex_mutex = 0;
+int running = 0;
 
 void draw_pixel(unsigned char *data, int width, int height, struct pixel p){
 	int val = width*p.y+p.x;
@@ -116,7 +108,7 @@ void perform_DSP(){
 			{
 				//printf("cent: %f %f\n", centroids[i].y, centroids[i].x);
 				//int val = 352*(int)centroids[i].y+(int)centroids[i].x;
-				white.x = centroids[i].x;
+				white.x = 352 - centroids[i].x;
 				white.y = centroids[i].y;
 				draw_circle(pixels2, 352, 288, white);
 				//pixels2[val*4+0] = SHORT_MAX;
@@ -137,16 +129,32 @@ void setup_textures(){
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, DATA_WIDTH, DATA_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
 	glEnable(GL_TEXTURE_2D);*/
 
-	//perform DSP
-	perform_DSP();
-
-	glGenTextures(1, &texture[1]);
+	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, texture[1]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, DATA_WIDTH, DATA_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels2);
-	glEnable(GL_TEXTURE_2D);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, DATA_WIDTH, DATA_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
 }
+
+void *read_from_camera(void *args){
+	while (running){
+		while(tex_mutex){ ; }
+		tex_mutex = 1;
+	    read(fp, buffer, DATA_LEN);
+	    for (int i = 0; i < DATA_LEN; ++i)
+	    {
+			pixels[i*4+0] = buffer[i];
+			pixels[i*4+1] = buffer[i];
+			pixels[i*4+2] = buffer[i];
+			pixels[i*4+3] = SHORT_MAX;
+	    }
+	    //perform DSP
+		perform_DSP();
+	    tex_mutex = 0;
+	}
+	return NULL;
+}
+
 
 //GLFW Window Error Callback function
 void error_callback(int error, const char* description)
@@ -162,6 +170,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
 int main(int argc, char const *argv[])
 {
+	running = 1;
 	//Init GLFW
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
@@ -177,37 +186,40 @@ int main(int argc, char const *argv[])
 	//Open IR Camera
 	fp = open("/dev/video0", O_RDONLY);
 
+	float ratio;
+	int width, height;
+
+	glfwGetFramebufferSize(window, &width, &height);
+	ratio = width / (float) height;
+
+	glViewport(0, 0, width, height);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
 	glfwSetKeyCallback(window, key_callback);
+
+	glGenTextures(1, &texture[1]);
+	glBindTexture(GL_TEXTURE_2D, texture[1]);
+
+	//make pthread
+	pthread_t cam_thread;
+	pthread_create(&cam_thread, NULL, read_from_camera, NULL);
+
 	while (!glfwWindowShouldClose(window))
 	{
-		float ratio;
-		int width, height;
-		glfwGetFramebufferSize(window, &width, &height);
-		ratio = width / (float) height;
+		while(tex_mutex){ ; }
+		tex_mutex = 1;
 
-		glViewport(0, 0, width, height);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-
-        copy_to_pixels();
-        setup_textures();
-
-        //Draw Raw Camera Data
-        /*glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, texture[0]);
-        glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f(-ratio, 1.0f, 0.0f);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f( 0.0f, 1.0f, 0.0);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f( 0.0f,-1.0f, 0.0);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f(-ratio, -1.0f, 0.0);
-		glEnd();*/
+		//make texture
+		setup_textures();
 
 		//Draw Processed Data
+		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, texture[1]);
 		glBegin(GL_QUADS);
 			glTexCoord2f(0.0f, 0.0f); glVertex3f( -ratio, 1.0f, 0.0f);
@@ -219,8 +231,23 @@ int main(int argc, char const *argv[])
 
 	    glfwSwapBuffers(window);
 	    glfwPollEvents();
-	}
 
+	    glfwGetFramebufferSize(window, &width, &height);
+		ratio = width / (float) height;
+
+		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+	    tex_mutex = 0;
+	}
+	printf("done\n");
+	running = 0;
+	pthread_join(cam_thread, NULL);
 	close(fp);
 
 	glfwDestroyWindow(window);

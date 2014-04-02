@@ -16,8 +16,8 @@
 
 struct Centroid
 {
-	float x;
-	float y;
+	int x;
+	int y;
 	int size;
 };
 
@@ -38,4 +38,7 @@ struct Centroid line_intersect(struct Centroid a1, struct Centroid a2, struct Ce
 void erode_cross(unsigned char *data, int width, int height);
 struct Centroid* get_centroids(unsigned char* data, int width, int height);
 void threshold(unsigned char *data, int width, int height, int thresh);
+void quantize(unsigned char *data, int width, int height, int qval);
+int zero_length_encode(char *data, int data_len);
+void zero_length_decode(char *buffer, unsigned char *data, int data_len);
 void clip_edges(unsigned char *data, int width, int height, int edge, int size);

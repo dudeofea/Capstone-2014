@@ -36,3 +36,4 @@ void threshold(unsigned char *data, int width, int height, int thresh);
 void quantize(unsigned char *data, int width, int height, int qval);
 int zero_length_encode(char *data, int data_len);
 void zero_length_decode(char *buffer, unsigned char *data, int data_len);
+unsigned char checksum(unsigned char *data, int len);

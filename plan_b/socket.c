@@ -105,6 +105,9 @@ Centroid* get_fingers(){
 		write(sockfd, buffer+offset, CHUNK_LEN);
 		offset += CHUNK_LEN;
 	}
+	unsigned char check = checksum(buffer, DATA_LEN);
+	//write checksum
+	write_int(sockfd, check);
 	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, 0xFF / 4);
 	struct Centroid *cents = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
 	for (int i = 0; i < 10; ++i)

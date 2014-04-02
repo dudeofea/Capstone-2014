@@ -359,6 +359,16 @@ void test_zlc3(void){
    CU_ASSERT(pixels_equal(end_pixels, ans, 10, 1));
 }
 
+//Test checksum function
+void test_check1(void){
+   unsigned char data[10] = {
+      255, 1, 0, 0, 10, 0, 0, 0, 0, 5
+   };
+
+   unsigned char check = checksum(data, 10);
+   CU_ASSERT(check == 15);
+}
+
 /* The main() function for setting up and running the tests.
  * Returns a CUE_SUCCESS on successful running, another
  * CUnit error code on failure.
@@ -396,7 +406,7 @@ int main()
    CU_add_test(pSuite, "test pixel zero length encoding 1", test_zlc1);
    CU_add_test(pSuite, "test pixel zero length encoding 2", test_zlc2);
    CU_add_test(pSuite, "test pixel zero length encoding 3", test_zlc3);
-
+   CU_add_test(pSuite, "test checksum 1", test_check1);
 
    /* Run all tests using the CUnit Basic interface */
    CU_basic_set_mode(CU_BRM_VERBOSE);

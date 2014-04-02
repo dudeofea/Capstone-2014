@@ -87,6 +87,15 @@ void quantize(unsigned char *data, int width, int height, int qval){
 	}
 }
 
+unsigned char checksum(unsigned char *data, int data_len){
+	unsigned char tmp = 0;
+	for (int i = 0; i < data_len; ++i)
+	{
+		tmp += data[i];
+	}
+	return tmp;
+}
+
 //erode using a cross pattern matrix
 void erode_cross(unsigned char *data, int width, int height){
 	unsigned char new_data[width*height];

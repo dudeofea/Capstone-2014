@@ -104,6 +104,17 @@ void clip_edges(unsigned char *data, int width, int height, int edge, int size){
 	}
 }
 
+//Quantizes an image
+void quantize(unsigned char *data, int width, int height, int qval){
+	int data_len = width*height;
+	int tmp;
+	for (int i = 0; i < data_len; ++i)
+	{
+		tmp = round((float)data[i] / qval);
+		data[i] = tmp * qval;
+	}
+}
+
 //erode using a cross pattern matrix
 void erode_cross(unsigned char *data, int width, int height){
 	unsigned char new_data[width*height];
@@ -134,7 +145,7 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 	int prev_val = 0;
 	int cent_index = SHORT_MIN + 1;
 	int new_index[SHORT_MAX];
-	static struct Centroid centroids[SHORT_MAX];
+	struct Centroid centroids[SHORT_MAX];
 	for (int i = 0; i < SHORT_MAX; ++i)
 	{
 		new_index[i] = i;
@@ -212,13 +223,76 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 		}
 	}
 	//normalize centroids
-	for (int i = 0; i < 255; ++i)
+	static struct Centroid fingers[10];
+	int finger_i = 0;
+	for (int i = 0; i < SHORT_MAX; ++i)
 	{
 		if (centroids[i].size > 0)
 		{
 			centroids[i].x /= centroids[i].size;
 			centroids[i].y /= centroids[i].size;
+			//add to return buffer
+			fingers[finger_i++] = centroids[i];
 		}
 	}
-	return centroids;
+	return fingers;
+}
+
+//Uses run-length coding to compress only the 0's.
+//Can handle up to 2^16 0's in a row
+//returns: new length of buffer
+int zero_length_encode(char *data, int data_len){
+	//temp buffer to hold zlc pixels
+	unsigned char buffer[data_len];
+	int zero_length = 0;
+	int buf_i = 0;
+	for (int i = 0; i < data_len; ++i)
+	{
+		if (data[i] == 0)
+		{
+			//if zero
+			zero_length++;
+		}else{
+			//if there was a run of zeros
+			if (zero_length > 0)
+			{
+				//a zero
+				buffer[buf_i++] = 0;
+				//highest byte
+				buffer[buf_i++] = (zero_length&0x00FF00)>>8;
+				//lowest byte
+				buffer[buf_i++] = (zero_length&0x0000FF);
+				zero_length = 0;
+			}
+			buffer[buf_i++] = data[i];
+		}
+	}
+	//copy to data
+	memcpy(data, buffer, buf_i);
+	//return length
+	return buf_i;
+}
+
+//length must be known. Decompresses a zl coded
+//diff buffer into another data buffer.
+void zero_length_decode(char *buffer, unsigned char *data, int data_len){
+	int buf_i = 0;
+	int zero_length = 0;
+	for (int i = 0; i < data_len; ++i)
+	{
+		if (buffer[buf_i] == 0)
+		{
+			//skip zero
+			buf_i++;
+			//get length from 2 bytes
+			zero_length |= (buffer[buf_i++]&0xFF)<<8;
+			zero_length |= (buffer[buf_i++]&0xFF);
+			//increase index
+			i += zero_length - 1;
+			zero_length = 0;
+		}else{
+			data[i] += buffer[buf_i];
+			buf_i++;
+		}
+	}
 }
