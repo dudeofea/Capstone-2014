@@ -43,8 +43,19 @@ struct pixel
 	int x, y;
 };
 
-struct pixel color1 = {SHORT_MAX, SHORT_MAX, SHORT_MIN, 0, 0};
-struct pixel color2 = {SHORT_MIN, SHORT_MAX, SHORT_MAX, 0, 0};
+struct pixel color1 = {SHORT_MIN, SHORT_MAX, SHORT_MAX, 0, 0};
+struct pixel finger_colors[10] = {
+	{SHORT_MAX, SHORT_MIN, SHORT_MAX, 0, 0},
+	{SHORT_MIN, SHORT_MIN, SHORT_MAX, 0, 0},
+	{SHORT_MIN, SHORT_MAX, SHORT_MIN, 0, 0},
+	{SHORT_MAX, SHORT_MAX, SHORT_MAX, 0, 0},
+	{SHORT_MIN, SHORT_MIN, SHORT_MIN, 0, 0},
+	{30, 70, 120, 0, 0},
+	{120, 30, 70, 0, 0},
+	{120, 120, 70, 0, 0},
+	{120, 30, 120, 0, 0},
+	{70, 30, 30, 0, 0},
+};
 GLuint texture[1];
 unsigned char buffer[DATA_LEN];
 unsigned char pixels[DATA_LEN * 4];
@@ -100,13 +111,9 @@ void perform_DSP(){
 	static int fingerup = 0;
 	struct Centroid last_centroid;
 	POINT point1, point2;
+	
 	//Threshold image
-	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, 5);
-	//clip_edges(buffer, DATA_WIDTH, DATA_HEIGHT, LEFT, 50);
-	//clip_edges(buffer, DATA_WIDTH, DATA_HEIGHT, TOP, 50);
-	//perform morphological erosion (computer only)
-	//erode_cross(buffer, 352, 288);
-	//erode_cross(buffer, 352, 288);
+	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, 4);
 
 	//calculate centroids
 	centroids = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
@@ -114,17 +121,19 @@ void perform_DSP(){
 	//load data into pixels as greyscale
 	for (int i = 0; i < DATA_LEN; ++i)
     {
-		if (buffer[i] > 0)
-		{
-			//blue
-			pixels2[i*4+0] = buffer[i] * 7;
-			pixels2[i*4+1] = 10;
-			pixels2[i*4+2] = SHORT_MAX;
-		}else{
-			//black
-			pixels2[i*4+0] = 0;
-			pixels2[i*4+1] = 0;
-			pixels2[i*4+2] = 0;
+    	if(calibrate){
+			// if (buffer[i] > 0)
+			// {
+			// 	//blue
+			// 	pixels2[i*4+0] = buffer[i] * 7;
+			// 	pixels2[i*4+1] = 10;
+			// 	pixels2[i*4+2] = SHORT_MAX;
+			//}else{
+				//black
+				pixels2[i*4+0] = 20;
+				pixels2[i*4+1] = 20;
+				pixels2[i*4+2] = 20;
+			//}
 		}
 		pixels2[i*4+3] = SHORT_MAX;
 		buffer[i] = 0;
@@ -143,9 +152,9 @@ void perform_DSP(){
     //if calibrating
     if (calibrate)
     {
-		color2.x = perfectPoints[calibrate-1].x;
-		color2.y = perfectPoints[calibrate-1].y;
-		draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, color2);
+		color1.x = perfectPoints[calibrate-1].x;
+		color1.y = perfectPoints[calibrate-1].y;
+		draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, color1);
 		if (fingerup)
 		{
 			actualPoints[calibrate-1].x = last_centroid.x;
@@ -154,7 +163,12 @@ void perform_DSP(){
 			//if done calibration
 			if (calibrate > 3)
 			{
-				//setCalibrationMatrix(&perfectPoints[0], &actualPoints[0], &calibMatrix);
+				setCalibrationMatrix(&perfectPoints[0], &actualPoints[0], &calibMatrix);
+				//clear pixels
+				for (int i = 0; i < DATA_LEN * 4; ++i)
+				{
+					pixels2[i] = 0;
+				}
 				calibrate = 0;
 			}
 			fingerup = 0;
@@ -167,18 +181,14 @@ void perform_DSP(){
 				//if decently sized, draw as a red pixel
 				if (centroids[i].size > 10)
 				{
-					//point2.x = DATA_WIDTH - centroids[i].x;
-					//point2.y = centroids[i].y;
-					//getDisplayPoint(&point1, &point2, &calibMatrix) ;
+					point2.x = centroids[i].x;
+					point2.y = centroids[i].y;
+					getDisplayPoint(&point1, &point2, &calibMatrix) ;
 					//printf("cent: %f %f\n", centroids[i].y, centroids[i].x);
 					//int val = 352*(int)centroids[i].y+(int)centroids[i].x;
-					color1.x = DATA_WIDTH - centroids[i].x;
-					color1.y = centroids[i].y;
-					draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, color1);
-					//pixels2[val*4+0] = SHORT_MAX;
-					//pixels2[val*4+1] = SHORT_MAX;
-					//pixels2[val*4+2] = SHORT_MAX;
-					//pixels2[val*4+3] = SHORT_MAX;
+					finger_colors[0].x = point1.x;
+					finger_colors[0].y = point1.y;
+					draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, finger_colors[0]);
 				}
 			}
 	    }
@@ -193,9 +203,6 @@ void setup_textures(){
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, DATA_WIDTH, DATA_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels);
 	glEnable(GL_TEXTURE_2D);*/
-
-	//perform DSP
-	//perform_DSP();
 
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, texture[1]);

@@ -239,6 +239,10 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 			centroids[i].y /= centroids[i].size;
 			//add to return buffer
 			fingers[finger_i++] = centroids[i];
+			if (finger_i >= 10)
+			{
+				break;
+			}
 		}
 	}
 	return fingers;
