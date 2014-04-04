@@ -208,6 +208,7 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 	int finger_i = 0;
 	for (int i = 0; i < SHORT_MAX; ++i)
 	{
+		fingers[i] = {0, 0, 0};
 		if (centroids[i].size > 0)
 		{
 			centroids[i].x /= centroids[i].size;

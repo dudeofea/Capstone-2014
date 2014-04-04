@@ -21,8 +21,13 @@
 #define CHUNK_NUM	16
 
 int fp;	//FILE pointer to camera feed
+int frame_ready = 0;	//mutex for camera
+int running = 0;
 int sockfd = 0;	//socket to DE2 Server
-unsigned char buffer[DATA_LEN];
+unsigned char buffer[DATA_LEN];			//pixels buffer
+unsigned char static_pixels[DATA_LEN];	//initial pixels buffer to subtract
+unsigned char send_pixels[DATA_LEN];	//pixels to send
+pthread_t cam_thread;
 
 unsigned int read_int(int filedes){
 	unsigned char buf[4] = {0,0,0,0};
@@ -47,12 +52,31 @@ void write_int(int filedes, unsigned int val){
 	write(filedes, buf, 4*sizeof(char));
 }
 
+void *read_from_camera(void *args){
+	while(running){
+		read(fp, buffer, DATA_LEN);
+		frame_ready = 0;
+		for (int i = 0; i < DATA_LEN; ++i)
+		{
+			if (buffer[i] > static_pixels[i])
+			{
+				send_pixels[i] = buffer[i] - static_pixels[i];
+			}else{
+				send_pixels[i] = 0;
+			}
+		}
+		frame_ready = 1;
+	}
+	return NULL;
+}
+
 int de2_init(){
+	running = 1;
 	//Open IR Camera
 	fp = open("/dev/video0", O_RDONLY);
 	int n = 0;
     char recvBuff[1024];
-    struct sockaddr_in serv_addr; 
+    struct sockaddr_in serv_addr;
 
     //init recv buffer
     memset(recvBuff, '0',sizeof(recvBuff));
@@ -84,39 +108,59 @@ int de2_init(){
     //Send buffer size
     write_int(sockfd, DATA_WIDTH);
 	write_int(sockfd, DATA_HEIGHT);
+
+	//read static image
+	for (int i = 0; i < 5; ++i)
+	{
+		read(fp, static_pixels, DATA_LEN);
+	}
+
+	//make pthread
+	pthread_create(&cam_thread, NULL, read_from_camera, NULL);
 	return 0;
 }
 
 int de2_close(){
+	running = 0;
+	pthread_join(cam_thread, NULL);
 	close(fp);
 	return 0;
 }
 
 Centroid* get_fingers(){
-	read(fp, buffer, DATA_LEN);
+	while(!frame_ready){ ; }
 	//write header
+	printf("hey1\n");
+	for (int i = 0; i < 10; ++i)
+	{
+		write_int(sockfd, 0x0);
+	}
 	write_int(sockfd, 0xdeadbeef);
+	printf("hey2\n");
 	write_int(sockfd, CHUNK_LEN);
+	printf("hey3\n");
 	write_int(sockfd, CHUNK_NUM);
 	int offset = 0;
 	for (int i = 0; i < CHUNK_NUM; ++i)
 	{
 		//send to device
-		write(sockfd, buffer+offset, CHUNK_LEN);
+		write(sockfd, send_pixels+offset, CHUNK_LEN);
 		offset += CHUNK_LEN;
 	}
-	unsigned char check = checksum(buffer, DATA_LEN);
+	printf("hey4\n");
+	int check = checksum(send_pixels, DATA_LEN);
+	printf("%x\n", check);
 	//write checksum
 	write_int(sockfd, check);
-	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, 0xFF / 4);
-	struct Centroid *cents = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
+	threshold(send_pixels, DATA_WIDTH, DATA_HEIGHT, 0xFF / 4);
+	struct Centroid *cents = get_centroids(send_pixels, DATA_WIDTH, DATA_HEIGHT);
 	for (int i = 0; i < 10; ++i)
 	{
-		//cents[i] = 
-		read_cent(sockfd);
+		cents[i] = read_cent(sockfd);
 		printf("cent: %d, %d, %d\n", cents[i].x, cents[i].y, cents[i].size);
 	}
-    //unsigned int a = read_int(sockfd);
+	printf("hey5\n");
+	read_cent(sockfd);
     //printf("Int: %x\n", a); 
 	return NULL;
 }

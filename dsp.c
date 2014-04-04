@@ -225,6 +225,12 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 	//normalize centroids
 	static struct Centroid fingers[10];
 	int finger_i = 0;
+	for (int i = 0; i < 10; ++i)
+	{
+		fingers[i].x = 0;
+		fingers[i].y = 0;
+		fingers[i].size = 0;
+	}
 	for (int i = 0; i < SHORT_MAX; ++i)
 	{
 		if (centroids[i].size > 0)
