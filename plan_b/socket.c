@@ -9,7 +9,15 @@
 *
 *	type make to build, ./dsp to run
 *	This was developed on Ubuntu 13.10
+*
+	de2_init();
+	while(1)
+		get_fingers();
+	de2_close();
 */
+//to fix popen
+#define _GNU_SOURCE
+
 #include "socket.h"
 #include "dsp.h"
 
@@ -70,10 +78,32 @@ void *read_from_camera(void *args){
 	return NULL;
 }
 
+//Finds out how many camers we have (1 or 2)
+int get_camera_num(){
+	size_t len;
+	char* buf = NULL;
+	FILE* cam_pointer = popen("ls /dev/ | grep [Vv]ideo1", "r");
+	getline(&buf, &len, cam_pointer);
+	if (buf != NULL)
+	{
+		return 2;
+	}
+	return 1;
+	pclose(cam_pointer);
+}
+
 int de2_init(){
 	running = 1;
+
+	int cam_num = get_camera_num();
 	//Open IR Camera
-	fp = open("/dev/video0", O_RDONLY);
+	if (cam_num == 1)
+	{
+		fp = open("/dev/video0", O_RDONLY);
+	}else{
+		fp = open("/dev/video1", O_RDONLY);
+	}
+	
 	int n = 0;
     char recvBuff[1024];
     struct sockaddr_in serv_addr;
@@ -127,12 +157,13 @@ int de2_close(){
 	return 0;
 }
 
-Centroid* get_fingers(){
+struct Centroid* get_fingers(){
 	while(!frame_ready){ ; }
 	//write header
 	printf("hey1\n");
 	for (int i = 0; i < 10; ++i)
 	{
+		//padding
 		write_int(sockfd, 0x0);
 	}
 	write_int(sockfd, 0xdeadbeef);
@@ -152,8 +183,9 @@ Centroid* get_fingers(){
 	printf("%x\n", check);
 	//write checksum
 	write_int(sockfd, check);
-	threshold(send_pixels, DATA_WIDTH, DATA_HEIGHT, 0xFF / 4);
-	struct Centroid *cents = get_centroids(send_pixels, DATA_WIDTH, DATA_HEIGHT);
+	//threshold(send_pixels, DATA_WIDTH, DATA_HEIGHT, 0xFF / 4);
+	//struct Centroid *cents = get_centroids(send_pixels, DATA_WIDTH, DATA_HEIGHT);
+	static struct Centroid cents[10];
 	for (int i = 0; i < 10; ++i)
 	{
 		cents[i] = read_cent(sockfd);
@@ -161,6 +193,5 @@ Centroid* get_fingers(){
 	}
 	printf("hey5\n");
 	read_cent(sockfd);
-    //printf("Int: %x\n", a); 
-	return NULL;
+	return cents;
 }

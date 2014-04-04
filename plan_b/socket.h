@@ -23,22 +23,10 @@
 #include <arpa/inet.h> 
 #include <pthread.h>
 
-typedef struct
-{
-	float x;
-	float y;
-	int size;
-} Centroid;
-
-typedef struct
-{
-	float x;	//Center X
-	float y;	//Center Y
-	float r;	//Radius
-} Circle;
+#include "dsp.h"
 
 int de2_init();
 int de2_close();
-Centroid* get_fingers();
+struct Centroid* get_fingers();
 
 #endif

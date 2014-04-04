@@ -28,6 +28,7 @@
 
 #include "dsp.h"
 #include "calibrate.h"
+#include "finger.h"
 
 #define DATA_LEN	352*288
 #define DATA_WIDTH	352
@@ -113,22 +114,24 @@ void perform_DSP(){
 	POINT point1, point2;
 	
 	//Threshold image
-	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, 4);
+	threshold(buffer, DATA_WIDTH, DATA_HEIGHT, 10);
 
 	//calculate centroids
 	centroids = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
+	//update fingers
+	input_centroids(centroids);
 
 	//load data into pixels as greyscale
 	for (int i = 0; i < DATA_LEN; ++i)
     {
     	if(calibrate){
 			// if (buffer[i] > 0)
-			// {
-			// 	//blue
-			// 	pixels2[i*4+0] = buffer[i] * 7;
-			// 	pixels2[i*4+1] = 10;
-			// 	pixels2[i*4+2] = SHORT_MAX;
-			//}else{
+			//  {
+			//  	//blue
+			//  	pixels2[i*4+0] = buffer[i] * 7;
+			//  	pixels2[i*4+1] = 10;
+			//  	pixels2[i*4+2] = SHORT_MAX;
+			// }else{
 				//black
 				pixels2[i*4+0] = 20;
 				pixels2[i*4+1] = 20;
@@ -174,20 +177,22 @@ void perform_DSP(){
 			fingerup = 0;
 		}
     }else{
+    	struct Centroid tmp;
 	    if (centroids != NULL)
 	    {
 	    	for (int i = 0; i < 10; ++i)
 			{
+				tmp = get_finger(i);
 				//if decently sized, draw as a red pixel
-				if (centroids[i].size > 10)
+				if (tmp.size > 10)
 				{
-					point2.x = centroids[i].x;
-					point2.y = centroids[i].y;
+					point2.x = tmp.x;
+					point2.y = tmp.y;
 					getDisplayPoint(&point1, &point2, &calibMatrix) ;
 					//printf("cent: %f %f\n", centroids[i].y, centroids[i].x);
 					//int val = 352*(int)centroids[i].y+(int)centroids[i].x;
-					finger_colors[0].x = point1.x;
-					finger_colors[0].y = point1.y;
+					finger_colors[i].x = point1.x;
+					finger_colors[i].y = point1.y;
 					draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, finger_colors[0]);
 				}
 			}

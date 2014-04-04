@@ -10,6 +10,9 @@
 *	
 *	See cluster.png to see an example of centroid calculation
 */
+#ifndef _DSP_H_
+#define _DSP_H_
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -42,3 +45,5 @@ void quantize(unsigned char *data, int width, int height, int qval);
 int zero_length_encode(char *data, int data_len);
 void zero_length_decode(char *buffer, unsigned char *data, int data_len);
 void clip_edges(unsigned char *data, int width, int height, int edge, int size);
+
+#endif
