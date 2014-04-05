@@ -2,6 +2,7 @@
 #include <string.h>
 #include "CUnit/Basic.h"
 #include "../dsp.h"
+#include "../finger.h"
 
 void print_pixel_array(unsigned char *data, int width, int height){
 	printf("----ARRAY----\n");
@@ -19,7 +20,7 @@ void print_centroid_array(struct Centroid* cents, int len){
 	printf("----ARRAY----\n");
 	for (int i = 0; i < len; ++i)
 	{
-		printf(" (%f, %f) s:%d\n", cents[i].x, cents[i].y, cents[i].size);
+		printf(" (%d, %d) s:%d\n", cents[i].x, cents[i].y, cents[i].size);
 	}
 }
 
@@ -271,6 +272,31 @@ void test_circle1(void){
    CU_ASSERT(c.r == ans.r);
 }
 
+/*
+*  Test for finger tracking methods
+*/
+void test_finger1(void){
+   struct Centroid points1[5]={
+      {0, 0, 0},
+      {200, 100, 50},
+      {100, 300, 50},
+      {0, 0, 0},
+      {400, 0, 50},
+   };
+   ft_input_centroids(points1, 5);
+   struct Centroid points2[5]={
+      {210, 90, 55},
+      {0, 0, 0},
+      {0, 0, 0},
+      {370, 0, 75},
+      {100, 320, 65},
+   };
+   ft_input_centroids(points2, 5);
+   CU_ASSERT(ft_get_finger(0).size == 55);
+   CU_ASSERT(ft_get_finger(1).size == 65);
+   CU_ASSERT(ft_get_finger(2).size == 75);
+}
+
 /* The main() function for setting up and running the tests.
  * Returns a CUE_SUCCESS on successful running, another
  * CUnit error code on failure.
@@ -300,9 +326,10 @@ int main()
    CU_add_test(pSuite, "test centroid calculation 3", test_centroid6);
    CU_add_test(pSuite, "test centroid calculation 4", test_centroid7);
    CU_add_test(pSuite, "test centroid placement in array 1", test_centroid8);
-   CU_add_test(pSuite, "test line intersection 1", test_line1);
-   CU_add_test(pSuite, "test line intersection 2", test_line2);
-   CU_add_test(pSuite, "test circle calculation 1", test_circle1);
+   //CU_add_test(pSuite, "test line intersection 1", test_line1);
+   //CU_add_test(pSuite, "test line intersection 2", test_line2);
+   //CU_add_test(pSuite, "test circle calculation 1", test_circle1);
+   CU_add_test(pSuite, "test finger tracking 1", test_finger1);
 
    /* Run all tests using the CUnit Basic interface */
    CU_basic_set_mode(CU_BRM_VERBOSE);

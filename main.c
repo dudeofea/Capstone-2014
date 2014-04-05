@@ -46,16 +46,16 @@ struct pixel
 
 struct pixel color1 = {SHORT_MIN, SHORT_MAX, SHORT_MAX, 0, 0};
 struct pixel finger_colors[10] = {
-	{SHORT_MAX, SHORT_MIN, SHORT_MAX, 0, 0},
-	{SHORT_MIN, SHORT_MIN, SHORT_MAX, 0, 0},
-	{SHORT_MIN, SHORT_MAX, SHORT_MIN, 0, 0},
-	{SHORT_MAX, SHORT_MAX, SHORT_MAX, 0, 0},
-	{SHORT_MIN, SHORT_MIN, SHORT_MIN, 0, 0},
-	{30, 70, 120, 0, 0},
-	{120, 30, 70, 0, 0},
-	{120, 120, 70, 0, 0},
-	{120, 30, 120, 0, 0},
-	{70, 30, 30, 0, 0},
+	{75, 42, 27, 0, 0},
+	{147, 87, 37, 0, 0},
+	{93, 66, 21, 0, 0},
+	{234, 186, 84, 0, 0},
+	{90, 87, 32, 0, 0},
+	{55, 24, 21, 0, 0},
+	{91, 24, 16, 0, 0},
+	{198, 52, 39, 0, 0},
+	{255, 112, 98, 0, 0},
+	{255, 67, 3, 0, 0},
 };
 GLuint texture[1];
 unsigned char buffer[DATA_LEN];
@@ -119,7 +119,7 @@ void perform_DSP(){
 	//calculate centroids
 	centroids = get_centroids(buffer, DATA_WIDTH, DATA_HEIGHT);
 	//update fingers
-	input_centroids(centroids);
+	ft_input_centroids(centroids, 10);
 
 	//load data into pixels as greyscale
 	for (int i = 0; i < DATA_LEN; ++i)
@@ -182,7 +182,7 @@ void perform_DSP(){
 	    {
 	    	for (int i = 0; i < 10; ++i)
 			{
-				tmp = get_finger(i);
+				tmp = ft_get_finger(i);
 				//if decently sized, draw as a red pixel
 				if (tmp.size > 10)
 				{
@@ -193,10 +193,23 @@ void perform_DSP(){
 					//int val = 352*(int)centroids[i].y+(int)centroids[i].x;
 					finger_colors[i].x = point1.x;
 					finger_colors[i].y = point1.y;
-					draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, finger_colors[0]);
+					draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, finger_colors[i]);
 				}
 			}
 	    }
+	}
+	//if big mass detected, clear screen
+	for (int i = 0; i < 10; ++i)
+	{
+		if (centroids[i].size > 800)
+		{
+			for (int j = 0; j < DATA_LEN * 4; ++j)
+			{
+				pixels2[j] = 0;
+			}
+			sleep(2);
+			ft_clear_fingers();
+		}
 	}
 }
 
