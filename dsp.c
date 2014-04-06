@@ -18,7 +18,12 @@
 #define SHORT_MAX	255
 #define SHORT_MIN	0
 
-//Calculates a circle based on 3 points
+//* Function: Get Circle
+//* Description: Calculates a circle using three points that will fit on
+//that circle. Deprecated since Centroids no longer have floats
+//* Input: Three centroids
+//* Returns: A Circle struct
+//---------DEPRECATED-----------
 struct Circle get_circle(struct Centroid a, struct Centroid b, struct Centroid c){
 	struct Circle circle;
 	struct Centroid ab1_p, ab2_p, bc1_p, bc2_p;		//Perpendicular points used to create a bisector
@@ -41,29 +46,39 @@ struct Circle get_circle(struct Centroid a, struct Centroid b, struct Centroid c
 	return circle;
 }
 
-//Get line intersection from 2 lines formed from Centroids
+//* Function: Get Line Intersect
+//* Description: Calculates the line intersection of two lines formed
+// by 4 points. Deprecated since Centroids no longer have floats
+//* Input: Four centroids forming 2 lines
+//* Returns: An intersection point as a Centroid
+//---------DEPRECATED-----------
 struct Centroid line_intersect(struct Centroid a1, struct Centroid a2, struct Centroid b1, struct Centroid b2){
 	struct Centroid intersect;
-	float slopeA = (a2.y - a1.y) / (a2.x - a1.x);
-	float slopeB = (b2.y - b1.y) / (b2.x - b1.x);
-	float offsetA = a1.y - slopeA * a1.x;
-	float offsetB = b1.y - slopeB * b1.x;
+	float slopeA = (a2.y - a1.y) / (a2.x - a1.x);		//get Ma
+	float slopeB = (b2.y - b1.y) / (b2.x - b1.x);		//get Mb
+	float offsetA = a1.y - slopeA * a1.x;				//get Ba
+	float offsetB = b1.y - slopeB * b1.x;				//get Bb
 	if (slopeA == slopeB)
 	{
 		//Either parallel or coincident
 		//Both of which suck.
 		intersect.x = 0;
 		intersect.y = 0;
+		intersect.size = -1;
 		return intersect;
 	}
-	intersect.x = (offsetB - offsetA) / (slopeA - slopeB);
-	intersect.y = a1.y + slopeA * (intersect.x - a1.x);
-	//printf("x: %f\n", intersect.x);
-	//printf("y: %f\n", intersect.y);
+	//find intersect using y = M*x + B
+	intersect.x = (offsetB - offsetA) / (slopeA - slopeB);	//since Ma*x + Ba = Mb*x + Bb
+	intersect.y = a1.y + slopeA * (intersect.x - a1.x);		//find y from x using M*x + B
 	return intersect;
 }
 
-//Create a binary image by thresholding
+//* Function: Threshold
+//* Description: Turns an image into a binary image using a given
+//threshold. If a value if below the thresh, it is 0, otherwise
+//it is 255(SHORT_MAX)
+//* Input: pixel buffer, pixel width/height, threshold value
+//* Returns: nothing
 void threshold(unsigned char *data, int width, int height, int thresh){
 	int data_len = width*height;
 	for (int i = 0; i < data_len; ++i)
@@ -76,21 +91,29 @@ void threshold(unsigned char *data, int width, int height, int thresh){
 	}
 }
 
-//clip an edge based on a size
+//* Function: Clip Edges
+//* Description: Blackens an image, starting from either TOP, BOTTOM, or LEFT.
+//The pixels are set to black (zero) by the specified <size>
+//* Input: pixel buffer, pixel width/height, specified edge, size of clip
+//* Returns: nothing
+//---------------DEPRECATED------------------
 void clip_edges(unsigned char *data, int width, int height, int edge, int size){
 	switch(edge){
+		//start from the top going down
 		case TOP:
 			for (int i = 0; i < width*size; ++i)
 			{
 				data[i] = 0;
 			}
 			break;
+		//starting from the bottom going up
 		case BOTTOM:
 			for (int i = width*(height - size); i < width*height; ++i)
 			{
 				data[i] = 0;
 			}
 			break;
+		//starting at the left moving to the right
 		case LEFT:
 			for (int y = 0; y < width*height; y += width)
 			{
@@ -100,11 +123,17 @@ void clip_edges(unsigned char *data, int width, int height, int edge, int size){
 				}
 			}
 			break;
+		//didn't implement RIGHT since it was not needed at the time
 		default: break;
 	}
 }
 
-//Quantizes an image
+//* Function: Quantize
+//* Description: Downsamples the image based on <qval>. A <qval>
+//of 4 would mean the image levels would go from 0,4,8,12,...,252.
+//This function reduces the bit resolution of an image
+//* Input: pixel buffer, pixel width/height, quantization value
+//* Returns: nothing
 void quantize(unsigned char *data, int width, int height, int qval){
 	int data_len = width*height;
 	int tmp;
@@ -115,7 +144,19 @@ void quantize(unsigned char *data, int width, int height, int qval){
 	}
 }
 
-//erode using a cross pattern matrix
+//* Function: Erode using Cross Pattern Matrix
+//* Description: Performs morphological erosion using a cross
+//patterned matrix. visually:
+//
+//	0 1 0 0 0 0 				0 0 0 0 0 0
+//	1 1 1 1 1 0 				0 1 0 0 0 0
+//	0 1 1 1 1 0 	becomes ->	0 0 1 1 0 0
+//	0 0 1 1 1 0 				0 0 0 0 0 0
+//	0 0 0 0 0 0 				0 0 0 0 0 0
+//	0 0 0 0 1 0 				0 0 0 0 0 0
+//
+//* Input: pixel buffer, pixel width/height
+//* Returns: nothing
 void erode_cross(unsigned char *data, int width, int height){
 	unsigned char new_data[width*height];
 	memset(new_data, SHORT_MIN, width*height);
@@ -123,33 +164,36 @@ void erode_cross(unsigned char *data, int width, int height){
 	{
 		for (int x = 1; x < width - 1; ++x)
 		{
-			//if
+			//if pixel has other pixels above and below (basically, a cross pattern)
 			if( data[width*(y-1)+(x)] > SHORT_MIN &&
 				data[width*(y)+(x+1)] > SHORT_MIN &&
 				data[width*(y+1)+(x)] > SHORT_MIN &&
 				data[width*(y)+(x-1)] > SHORT_MIN &&
 				data[width*(y)+(x)] > SHORT_MIN){
-				new_data[width*(y)+(x)] = SHORT_MAX;
+				new_data[width*(y)+(x)] = SHORT_MAX;	//set to max
 			}else{
-				new_data[width*(y)+(x)] = SHORT_MIN;
+				new_data[width*(y)+(x)] = SHORT_MIN;	//set to 0
 			}
 		}
 	}
+	//copy new data to data buffer
 	memcpy(data, new_data, width*height);
 }
 
-/*
-* Pass in a binary array of pixel data and receive an array of centroids
-*/
+//* Function: Get Centroids
+//* Description: Calculates the centers of mass (Centroids) of a
+//binary image. This returns MAX_CENTROIDS number of Centroids.
+//* Input: pixel buffer, pixel width/height
+//* Returns: Centroid array of size MAX_CENTROIDS
 struct Centroid* get_centroids(unsigned char* data, int width, int height){
-	int prev_val = 0;
-	int cent_index = SHORT_MIN + 1;
-	int new_index[SHORT_MAX];
-	struct Centroid centroids[SHORT_MAX];
+	int prev_val = 0;					//previous pixel value
+	int cent_index = SHORT_MIN + 1;		//set grouping index to one above lowest value
+	int new_index[SHORT_MAX];			//array for group reassignment (in case groups merge)
+	struct Centroid centroids[SHORT_MAX];	//centroid array. can handle up to SHORT_MAX pixel groups
 	for (int i = 0; i < SHORT_MAX; ++i)
 	{
-		new_index[i] = i;
-		centroids[i].x = 0;
+		new_index[i] = i;		//new_index set to regular index
+		centroids[i].x = 0;		//blank out centroids
 		centroids[i].y = 0;
 		centroids[i].size = 0;
 	}
@@ -212,22 +256,22 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 	{
 		for (int x = 0; x < width; ++x)
 		{
-			val = width*y+x;
+			val = width*y+x;		//get 1D equivalent
 			data[val] = new_index[data[val]];
 			if (data[val] > 0)
 			{
-				centroids[data[val] - 1].x += x;
+				centroids[data[val] - 1].x += x;	//perform average minus division
 				centroids[data[val] - 1].y += y;
-				centroids[data[val] - 1].size++;
+				centroids[data[val] - 1].size++;	//increase size by one
 			}
 		}
 	}
 	//normalize centroids
-	static struct Centroid fingers[10];
+	static struct Centroid fingers[MAX_CENTROIDS];
 	int finger_i = 0;
-	for (int i = 0; i < 10; ++i)
+	for (int i = 0; i < MAX_CENTROIDS; ++i)
 	{
-		fingers[i].x = 0;
+		fingers[i].x = 0;		//blank out fingers
 		fingers[i].y = 0;
 		fingers[i].size = 0;
 	}
@@ -235,27 +279,33 @@ struct Centroid* get_centroids(unsigned char* data, int width, int height){
 	{
 		if (centroids[i].size > 0)
 		{
-			centroids[i].x /= centroids[i].size;
+			centroids[i].x /= centroids[i].size;	//complete averaging calc
 			centroids[i].y /= centroids[i].size;
 			//add to return buffer
 			fingers[finger_i++] = centroids[i];
-			if (finger_i >= 10)
+			if (finger_i >= MAX_CENTROIDS)
 			{
 				break;
 			}
 		}
 	}
+	//return array of size MAX_CENTROIDS
 	return fingers;
 }
 
-//Uses run-length coding to compress only the 0's.
-//Can handle up to 2^16 0's in a row
-//returns: new length of buffer
+//* Function: Get Centroids
+//* Description: Uses run-length coding to compress only the 0's.
+//Can handle up to 2^16 0's in a row. Example:
+//
+//	0,0,0,0,0,0,2,3,4,5,0,0 becomes-> 0,6,2,3,4,5,0,2
+//
+//* Input: pixel buffer, pixel length
+//* Returns: New length of buffer
 int zero_length_encode(char *data, int data_len){
 	//temp buffer to hold zlc pixels
 	unsigned char buffer[data_len];
-	int zero_length = 0;
-	int buf_i = 0;
+	int zero_length = 0;		//running count of zeros
+	int buf_i = 0;				//output buffer position
 	for (int i = 0; i < data_len; ++i)
 	{
 		if (data[i] == 0)
@@ -283,14 +333,17 @@ int zero_length_encode(char *data, int data_len){
 	return buf_i;
 }
 
-//length must be known. Decompresses a zl coded
-//diff buffer into another data buffer.
+//* Function: Get Centroids
+//* Description: length must be known. Decompresses a zl coded
+//diff buffer into another data buffer. See unit tests for examples
+//* Input: pixel difference buffer, pixel output buffer, data length
+//* Returns: Centroid array of size MAX_CENTROIDS
 void zero_length_decode(char *buffer, unsigned char *data, int data_len){
-	int buf_i = 0;
-	int zero_length = 0;
+	int buf_i = 0;			//input buffer position
+	int zero_length = 0;	//number of positions to skip (because the diff is 0)
 	for (int i = 0; i < data_len; ++i)
 	{
-		if (buffer[buf_i] == 0)
+		if (buffer[buf_i] == 0)		//if zero, skip some values
 		{
 			//skip zero
 			buf_i++;
@@ -300,7 +353,7 @@ void zero_length_decode(char *buffer, unsigned char *data, int data_len){
 			//increase index
 			i += zero_length - 1;
 			zero_length = 0;
-		}else{
+		}else{						//otherwise copy
 			data[i] += buffer[buf_i];
 			buf_i++;
 		}
