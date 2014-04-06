@@ -17,6 +17,7 @@
 #include <string.h>
 #include <math.h>
 
+//Struct to hold a position and size
 struct Centroid
 {
 	int x;
@@ -24,6 +25,7 @@ struct Centroid
 	int size;
 };
 
+//Struct to hold a center of a circle and it's radius
 struct Circle
 {
 	float x;	//Center X
@@ -31,11 +33,16 @@ struct Circle
 	float r;	//Radius
 };
 
+//directional defines for clip_edges
 #define TOP		0
 #define RIGHT	1
 #define BOTTOM	2
 #define LEFT	3
 
+//Number of fingers returned by get_centroids
+#define MAX_CENTROIDS			10
+
+//Function declarations
 struct Circle get_circle(struct Centroid a, struct Centroid b, struct Centroid c);
 struct Centroid line_intersect(struct Centroid a1, struct Centroid a2, struct Centroid b1, struct Centroid b2);
 void erode_cross(unsigned char *data, int width, int height);
