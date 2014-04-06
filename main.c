@@ -91,6 +91,12 @@
 //A decent amount of time
 #define DECENT_AMOUNT_OF_TIME	2 			//number in seconds which is an okay amount of time to wait
 
+//Drawing macros
+#define TEX_TOP_LEFT			0.0f, 0.0f
+#define TEX_TOP_RIGHT			1.0f, 0.0f
+#define TEX_BOT_RIGHT			1.0f, 1.0f
+#define TEX_BOT_LEFT			0.0f, 1.0f
+
 //structure to contain pixel values
 //for drawing
 struct pixel
@@ -387,61 +393,75 @@ void *read_from_camera(void *args){
 			pixels[i*RGBA_LEN+RGBA_B] = buffer[i];	//set blue value
 			pixels[i*RGBA_LEN+RGBA_A] = SHORT_MAX;	//set alpha to 100%
 	    }
-		//tex_mutex = 0;
+	    //perform dsp on buffer
 	    perform_DSP();
 	}
+	//return NULL when thread is told to close
 	return NULL;
 }
 
 
-//GLFW Window Error Callback function
+//* Function: Error Callback
+//* Description: Callback if GLFW messed up. Copied from first GLFW tutorial.
+//* Input: nothing
+//* Returns: nothing
 void error_callback(int error, const char* description)
 {
     fputs(description, stderr);
 }
-//GLFW Callback for close button on window
+
+//* Function: Key Callback
+//* Description: Callback if GLFW detects a window close or escape button. 
+//Copied from first GLFW tutorial.
+//* Input: nothing
+//* Returns: nothing
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
+        glfwSetWindowShouldClose(window, GL_TRUE);	//close program
 }
 
-//Finds out how many camers we have (1 or 2)
+//* Function: Get Number of Cameras
+//* Description: Runs grep to see if we have one or two camera inputs.
+//Assumes we have at least one
+//* Input: nothing
+//* Returns: 1 or 2
 int get_camera_num(){
-	size_t len;
-	char* buf = NULL;
-	FILE* cam_pointer = popen("ls /dev/ | grep [Vv]ideo1", "r");
-	getline(&buf, &len, cam_pointer);
+	size_t len;			//returned length
+	char* buf = NULL;	//receive buffer
+	FILE* cam_pointer = popen("ls /dev/ | grep [Vv]ideo1", "r");	//see if /dev/video1 exists
+	//normally this computer has 2 cameras video0 (built-in) and video1 (usb camera)
+	//but sometimes the built-in doesn't get found. If video1 exists, we have 2 cameras
+	//otherwise we have 1 camera
+	getline(&buf, &len, cam_pointer); 	//run the command
 	if (buf != NULL)
 	{
+		//video1 was found
 		return 2;
 	}
+	//video1 was not found
 	return 1;
 	pclose(cam_pointer);
 }
 
+//* Function: Main
+//* Description: Displays a drawing application using a touchscreen as input
+//and draws pixels to the screen according to the user.
+//* Input: nothing
+//* Returns: 0 or error code
 int main(int argc, char const *argv[])
 {
-	running = 1;
+	//program is running
+	running = BOOL_TRUE;
 	//Init GLFW
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
 	//set error callback
 	glfwSetErrorCallback(error_callback);
-	//get all screens
-	int count;
-	GLFWmonitor** monitors = glfwGetMonitors(&count);
-	//get size of last screen
-	int widthMM, heightMM;
-	glfwGetMonitorPhysicalSize(monitors[count-1], &widthMM, &heightMM);
+
 	//make fullscreen window from last monitor
-	GLFWwindow* window;
-	if (monitors != NULL)
-	{
-		window = glfwCreateWindow(640, 480, "Webcam DSP", NULL, NULL);
-	}else{
-		window = glfwCreateWindow(640, 480, "Webcam DSP", NULL, NULL);
-	}
+	GLFWwindow* window = glfwCreateWindow(640, 480, "Webcam DSP", NULL, NULL);
+	//if window messed up
 	if (!window)
 	{
 	    glfwTerminate();
@@ -449,68 +469,70 @@ int main(int argc, char const *argv[])
 	}
 	glfwMakeContextCurrent(window);
 
+	//get the amount of cameras we have
 	int cam_num = get_camera_num();
 
 	//Open IR Camera
 	if (cam_num == 1)
 	{
-		fp = open("/dev/video0", O_RDONLY);
+		fp = open("/dev/video0", O_RDONLY);		//if we have 1 camera
+	}else if(cam_num == 2){
+		fp = open("/dev/video1", O_RDONLY);		//if we have 2 cameras
 	}else{
-		fp = open("/dev/video1", O_RDONLY);
+		exit(EXIT_FAILURE);		//no clue what happened
 	}
-	
+	//get an initial static image
 	get_static_image();
 
-	float ratio;
-	int width, height;
+	float ratio;		//used to calculate the screen ratio
+	int width, height;	//width and height
 
 	//make pthread
-	pthread_t cam_thread;
-	pthread_create(&cam_thread, NULL, read_from_camera, NULL);
+	pthread_t cam_thread;										//camera thread
+	pthread_create(&cam_thread, NULL, read_from_camera, NULL);	//start camera thread
 
 	//generate texture
-	glGenTextures(1, &texture[1]);
-	glBindTexture(GL_TEXTURE_2D, texture[1]);
+	glGenTextures(1, &texture[1]);				//make a texture
+	glBindTexture(GL_TEXTURE_2D, texture[1]);	//bind it to the global texture
 
-	while (!glfwWindowShouldClose(window))
+	glfwSetKeyCallback(window, key_callback);	//set key callback for our window
+
+	while (!glfwWindowShouldClose(window))		//while window should stay open
 	{
-		glfwGetFramebufferSize(window, &width, &height);
-		ratio = width / (float) height;
+		glfwGetFramebufferSize(window, &width, &height);	//get window size
+		ratio = width / (float) height;						//recalc ratio
 
-		glViewport(0, 0, width, height);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glViewport(0, 0, width, height);					//set viewport bounds
+		glClear(GL_COLOR_BUFFER_BIT);						//clear screen
 
-		glMatrixMode(GL_PROJECTION);
+		glMatrixMode(GL_PROJECTION);						//set projection matrix
 	    glLoadIdentity();
 	    glOrtho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-	    glMatrixMode(GL_MODELVIEW);
+	    glMatrixMode(GL_MODELVIEW);							//set view matrix (identity)
 	    glLoadIdentity();
 
 		//make texture
 		setup_textures();
 
 		//Draw Processed Data
-		//glEnable(GL_TEXTURE_2D);
-		//glBindTexture(GL_TEXTURE_2D, texture[1]);
-		glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f( -ratio, 1.0f, 0.0f);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f( ratio, 1.0f, 0.0);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f( ratio,-1.0f, 0.0);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f( -ratio, -1.0f, 0.0);
+		glBegin(GL_QUADS);	//draw quads
+			glTexCoord2f(TEX_TOP_LEFT); glVertex3f( -ratio, 1.0f, 0.0f);		//top left vertex
+			glTexCoord2f(TEX_TOP_RIGHT); glVertex3f( ratio, 1.0f, 0.0);			//top right vertex
+			glTexCoord2f(TEX_BOT_RIGHT); glVertex3f( ratio,-1.0f, 0.0);			//bottom right vertex
+			glTexCoord2f(TEX_BOT_LEFT); glVertex3f( -ratio, -1.0f, 0.0);		//bottom left vertex
 		glEnd();
 		//glDisable(GL_TEXTURE_2D);
 
-		glfwSetKeyCallback(window, key_callback);
-
-	    glfwSwapBuffers(window);
-	    glfwPollEvents();
+	    glfwSwapBuffers(window);		//swap the buffers and effectively display the new image
+	    glfwPollEvents();				//see if anything happened
 	}
 	printf("done\n");
+	//kill camera thread
 	running = 0;
 	pthread_join(cam_thread, NULL);
-	close(fp);
+	close(fp);	//close camera feed
 
-	glfwDestroyWindow(window);
-	glfwTerminate();
+	glfwDestroyWindow(window);	//kill window
+	glfwTerminate();			//kill GLFW
 	return 0;
 }
