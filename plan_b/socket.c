@@ -28,6 +28,18 @@
 #define CHUNK_LEN	352 * 18
 #define CHUNK_NUM	16
 
+//Byte setters and getters
+#define BYTE4_SET(X)	(0xFF&X)<<24
+#define BYTE3_SET(X)	(0xFF&X)<<16
+#define BYTE2_SET(X)	(0xFF&X)<<8
+#define BYTE1_SET(X)	(0xFF&X)<<0
+#define BYTE4_GET(X)	(0xFF000000&X)>>24
+#define BYTE3_GET(X)	(0x00FF0000&X)>>16
+#define BYTE2_GET(X)	(0x0000FF00&X)>>8
+#define BYTE1_GET(X)	(0x000000FF&X)>>0
+//socket client header
+#define BYTE_HEADER		0xdeadbeef
+
 int fp;	//FILE pointer to camera feed
 int frame_ready = 0;	//mutex for camera
 int running = 0;
@@ -40,7 +52,10 @@ pthread_t cam_thread;
 unsigned int read_int(int filedes){
 	unsigned char buf[4] = {0,0,0,0};
 	read(filedes, buf, 4*sizeof(char));
-	unsigned int val = (0xFF&buf[0])<<24 | (0xFF&buf[1])<<16 | (0xFF&buf[2])<<8 | (0xFF&buf[3]);
+	unsigned int val = BYTE4_SET(buf[0]) | 
+					   BYTE3_SET(buf[1]) | 
+					   BYTE2_SET(buf[2]) | 
+					   BYTE1_SET(buf[3]);
 	return val;
 }
 
@@ -52,10 +67,10 @@ struct Centroid read_cent(int filedes){
 
 void write_int(int filedes, unsigned int val){
 	unsigned char buf[4] = {
-		(val&0xFF000000)>>24,
-		(val&0x00FF0000)>>16,
-		(val&0x0000FF00)>>8,
-		(val&0x000000FF)
+		BYTE4_GET(val),
+		BYTE3_GET(val),
+		BYTE2_GET(val),
+		BYTE1_GET(val)
 	};
 	write(filedes, buf, 4*sizeof(char));
 }
@@ -160,16 +175,13 @@ int de2_close(){
 struct Centroid* get_fingers(){
 	while(!frame_ready){ ; }
 	//write header
-	printf("hey1\n");
 	for (int i = 0; i < 10; ++i)
 	{
 		//padding
 		write_int(sockfd, 0x0);
 	}
-	write_int(sockfd, 0xdeadbeef);
-	printf("hey2\n");
+	write_int(sockfd, BYTE_HEADER);
 	write_int(sockfd, CHUNK_LEN);
-	printf("hey3\n");
 	write_int(sockfd, CHUNK_NUM);
 	int offset = 0;
 	for (int i = 0; i < CHUNK_NUM; ++i)
@@ -178,20 +190,16 @@ struct Centroid* get_fingers(){
 		write(sockfd, send_pixels+offset, CHUNK_LEN);
 		offset += CHUNK_LEN;
 	}
-	printf("hey4\n");
 	int check = checksum(send_pixels, DATA_LEN);
 	printf("%x\n", check);
 	//write checksum
 	write_int(sockfd, check);
-	//threshold(send_pixels, DATA_WIDTH, DATA_HEIGHT, 0xFF / 4);
-	//struct Centroid *cents = get_centroids(send_pixels, DATA_WIDTH, DATA_HEIGHT);
 	static struct Centroid cents[10];
 	for (int i = 0; i < 10; ++i)
 	{
 		cents[i] = read_cent(sockfd);
-		printf("cent: %d, %d, %d\n", cents[i].x, cents[i].y, cents[i].size);
+		//printf("cent: %d, %d, %d\n", cents[i].x, cents[i].y, cents[i].size);
 	}
-	printf("hey5\n");
 	read_cent(sockfd);
 	return cents;
 }

@@ -180,6 +180,20 @@ void erode_cross(unsigned char *data, int width, int height){
 	memcpy(data, new_data, width*height);
 }
 
+//* Function: Checksum
+//* Description: Calculates a checksum of pixels by summing
+//them together bytewise (with overflow of course)
+//* Input: pixel buffer, pixel buffer length
+//* Returns: a checksum byte
+unsigned char checksum(unsigned char *data, int data_len){
+	unsigned char tmp = 0;
+	for (int i = 0; i < data_len; ++i)
+	{
+		tmp += data[i];
+	}
+	return tmp;
+}
+
 //* Function: Get Centroids
 //* Description: Calculates the centers of mass (Centroids) of a
 //binary image. This returns MAX_CENTROIDS number of Centroids.

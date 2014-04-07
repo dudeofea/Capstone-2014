@@ -7,6 +7,9 @@
 *	Captures USB data from a Playstation 2 Controller
 *	and moves the mouse accordingly
 *
+*	The controllers are hooked into a USB PS2 controller
+*	Hub such as this one: http://i00.i.aliimg.com/img/pb/531/730/506/506730531_817.jpg
+*
 *	This will be modified to run with the DE2 instead
 *	of a PS2 Controller, since both use USB.
 *
@@ -26,10 +29,13 @@
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
 
+//product and vendor id of device
 #define PS2_VENDOR_ID		0x0810
 #define PS2_PRODUCT_ID		0x0001
 
+//usb transfer definitions
 #define PS2_ENDPOINT		0x81
+#define PS2_ENDPOINT_TO		500
 
 #define NEUTRAL				0x0f0000
 #define CROSS_BUTTON		0x400000
@@ -45,9 +51,22 @@
 #define START_BUTTON		0x2000
 #define	SELECT_BUTTON		0x1000
 
+#define ZERO_OFFSET			0x7f		//corresponding zero of ps2 analog stick
+#define FLOAT_OFFSET		128.0 		//number used to offset and scale stick from -1.0 to 1.0
+
+//sets a number into a byte
+#define BYTE4_SET(X)			X << 24
+#define BYTE3_SET(X)			X << 16
+#define BYTE2_SET(X)			X << 8
+#define BYTE1_SET(X)			X << 0
+
 #define bool char
 #define false				0
 #define true				1
+
+#define MOUSE_CLICK			1 			//left mouse button
+#define MOUSE_SCROLL_D		4 			//mouse scroll down
+#define MOUSE_SCROLL_U		5 			//mouse scroll up
 
 struct ps2_controller
 {

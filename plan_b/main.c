@@ -30,35 +30,85 @@
 #include "calibrate.h"
 #include "socket.h"
 
-#define DATA_LEN	352*288
+//Size of camera image
 #define DATA_WIDTH	352
 #define DATA_HEIGHT	288
-#define MIN(X,Y) ((X) < (Y) ? (X) : (Y))
+#define DATA_LEN	DATA_WIDTH*DATA_HEIGHT
 
+//For DSP, byte image definitions
 #define SHORT_MAX	255
 #define SHORT_MIN	0
+#define RGBA_LEN	4
+#define RGBA_R		0
+#define RGBA_G		1
+#define RGBA_B		2
+#define RGBA_A		3
 
+//boolean values
+#define BOOL_FALSE	0 		//not truth value
+#define BOOL_TRUE	1 		//truth value
+
+#define BRUSH_COLOR_MAX_VAL		10 			//total number of colours
+#define BRUSH_SIZE				5 			//drawn size
+
+//Color definitions
+#define COLOR_TURQUOISE	{SHORT_MIN, SHORT_MAX, SHORT_MAX, 0, 0}
+#define COLOR_BLACK		{0, 0, 0, 0, 0}
+#define COLOR_DARK_GREY	{20, 20, 20, 0, 0}
+#define JUNGLE_PALETTE1	{55, 24, 21, 0, 0}	//taken from http://media-cache-ec0.pinimg.com/736x/1f/d8/8a/1fd88ac2fdc296cce6b1791322ed4223.jpg
+#define JUNGLE_PALETTE2	{91, 24, 16, 0, 0}
+#define JUNGLE_PALETTE3	{198, 52, 39, 0, 0}
+#define JUNGLE_PALETTE4	{255, 112, 98, 0, 0}
+#define JUNGLE_PALETTE5	{255, 67, 3, 0, 0}
+#define NATURE_PALETTE1	{75, 42, 27, 0, 0}	//taken from http://media-cache-ec0.pinimg.com/236x/b1/4f/3f/b14f3faeceef31ccad2eb0fea03adff4.jpg
+#define NATURE_PALETTE2	{147, 87, 37, 0, 0}
+#define NATURE_PALETTE3	{93, 66, 21, 0, 0}
+#define NATURE_PALETTE4	{234, 186, 84, 0, 0}
+
+//Drawing macros
+#define TEX_TOP_LEFT			0.0f, 0.0f
+#define TEX_TOP_RIGHT			1.0f, 0.0f
+#define TEX_BOT_RIGHT			1.0f, 1.0f
+#define TEX_BOT_LEFT			0.0f, 1.0f
+
+//structure to contain pixel values
+//for drawing
 struct pixel
 {
 	int r, g, b;
 	int x, y;
 };
 
-struct pixel color1 = {SHORT_MIN, SHORT_MAX, SHORT_MAX, 0, 0};
-struct pixel finger_colors[10] = {
-	{SHORT_MAX, SHORT_MIN, SHORT_MAX, 0, 0},
-	{SHORT_MIN, SHORT_MIN, SHORT_MAX, 0, 0},
-	{SHORT_MIN, SHORT_MAX, SHORT_MIN, 0, 0},
-	{SHORT_MAX, SHORT_MAX, SHORT_MAX, 0, 0},
-	{SHORT_MIN, SHORT_MIN, SHORT_MIN, 0, 0},
-	{30, 70, 120, 0, 0},
-	{120, 30, 70, 0, 0},
-	{120, 120, 70, 0, 0},
-	{120, 30, 120, 0, 0},
-	{70, 30, 30, 0, 0},
+//Color used for calibration
+struct pixel calib_color = COLOR_TURQUOISE;
+//colors used for drawing
+struct pixel black = COLOR_BLACK;
+struct pixel finger_colors[BRUSH_COLOR_MAX_VAL] = {
+	NATURE_PALETTE1,
+	NATURE_PALETTE2,
+	NATURE_PALETTE3,
+	NATURE_PALETTE4,
+	COLOR_BLACK,
+	JUNGLE_PALETTE1,
+	JUNGLE_PALETTE2,
+	JUNGLE_PALETTE3,
+	JUNGLE_PALETTE4,
+	JUNGLE_PALETTE5,
 };
+
+//texture to hold output pixel buffer
 GLuint texture[1];
-unsigned char pixels2[DATA_LEN * 4];
+//raw bayer pixel buffer, read from camera
+unsigned char buffer[DATA_LEN];
+//Pixel buffer to hold data to be output to 
+//the screen. In this case, the colors are
+//drawn onto this pixel buffer.
+unsigned char pixels2[DATA_LEN * RGBA_LEN];
+
+//image to subtract
+unsigned char static_pixels[DATA_LEN];
+//File pointer to camera feed. Typically /dev/video0
+int fp;
 
 //for calibration. Scaled with 352x288
 POINT perfectPoints[3] ={
@@ -73,31 +123,45 @@ MATRIX calibMatrix;
 pthread_t dsp_thread;
 int dsp_running = 0;
 
+//* Function: Draw Pixel
+//* Description: Draws a pixel to the screen, if the specified
+//point exists. Otherwise draws nothing.
+//* Input: pixel buffer, buffer width/height, pixel struct containing
+//info about what to draw where
+//* Returns: nothing
 void draw_pixel(unsigned char *data, int width, int height, struct pixel p){
-	int val = width*p.y+p.x;
-	if (val < 0 || val >= width*height)
+	int val = width*p.y+p.x;	//get position in 1D array
+	if (val < 0 || val >= width*height)		//if out of bounds
 		return;
-	data[val*4+0] = p.r;
-	data[val*4+1] = p.g;
-	data[val*4+2] = p.b;
-	data[val*4+3] = SHORT_MAX;
+	data[val*RGBA_LEN+RGBA_R] = p.r;		//set red value
+	data[val*RGBA_LEN+RGBA_G] = p.g;		//set green value
+	data[val*RGBA_LEN+RGBA_B] = p.b;		//set blue value
+	data[val*RGBA_LEN+RGBA_A] = SHORT_MAX;	//set alpha value to 100% (opaque)
 }
 
-void draw_circle(unsigned char *data, int width, int height, struct pixel p){
-	int y0 = p.y, x0 = p.x;
-	for (int y = 0; y < 5; ++y){
-		p.y = y0 + y;
-		for (int x = 0; x < 5; ++x){
-			p.x = x0 + x;
-			draw_pixel(data, width, height, p);
+//* Function: Draw Square
+//* Description: Draws a square of specified size to the screen.
+//* Input: pixel buffer, buffer width/height, pixel struct containing
+//info about what to draw where, size of square
+//* Returns: nothing
+void draw_square(unsigned char *data, int width, int height, struct pixel p){
+	int y0 = p.y, x0 = p.x;			//store initial x and y
+	for (int y = 0; y < BRUSH_SIZE; ++y){				//draw square of height: size
+		p.y = y0 + y;							//move pixel to correct height
+		for (int x = 0; x < BRUSH_SIZE; ++x){			//draw square of width: size
+			p.x = x0 + x;						//move pixel to correct width
+			draw_pixel(data, width, height, p);	//draw the pixel
 		}
 	}
 }
 
-//Assumes 10 fingers. returns 0th element if nothing found
+//* Function: Get Biggest Finger
+//* Description: Draws a square of specified size to the screen.
+//* Input: Centroid array of size MAX_CENTROIDS
+//* Returns: nothing
 struct Centroid get_biggest_finger(struct Centroid *cents){
 	int index = 0;
-	for (int i = 0; i < 10; ++i)
+	for (int i = 0; i < MAX_CENTROIDS; ++i)
 	{
 		if (cents[i].size > cents[index].size)
 		{
@@ -107,6 +171,15 @@ struct Centroid get_biggest_finger(struct Centroid *cents){
 	return cents[index];
 }
 
+//* Function: Perform DSP
+//* Description: Performs a number of operations on the camera input
+//such as thresholding/centroid calc. Then draw squares on the screen
+//or switch color or brush size, or even clear the screen. Depending
+//on the number of centroids and their size, a different gesture is
+//detected and the corresponding action is performed. See below for
+//more details
+//* Input: nothing
+//* Returns: nothing
 void *perform_DSP(void *args){
 	static int calibrate = 1;
 	struct Centroid *centroids;
@@ -118,18 +191,7 @@ void *perform_DSP(void *args){
 	while(dsp_running){
 		//calculate centroids
 		centroids = get_fingers();
-
-		//load data into pixels as greyscale
-		for (int i = 0; i < DATA_LEN; ++i)
-	    {
-	    	if(calibrate){
-				//black
-				pixels2[i*4+0] = 20;
-				pixels2[i*4+1] = 20;
-				pixels2[i*4+2] = 20;
-			}
-			pixels2[i*4+3] = SHORT_MAX;
-	    }
+		
 	    //if fingers are touching
 		if (centroids[0].size > 0)
 		{
@@ -144,23 +206,38 @@ void *perform_DSP(void *args){
 	    //if calibrating
 	    if (calibrate)
 	    {
-			color1.x = perfectPoints[calibrate-1].x;
-			color1.y = perfectPoints[calibrate-1].y;
-			draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, color1);
+	    	//black out screen if calbrating
+	    	struct pixel back_color = COLOR_DARK_GREY;	//background color
+			for (int i = 0; i < DATA_LEN; ++i)
+		    {
+				//dark grey
+				pixels2[i*RGBA_LEN+RGBA_R] = back_color.r;	//set red value
+				pixels2[i*RGBA_LEN+RGBA_G] = back_color.g;	//set green value
+				pixels2[i*RGBA_LEN+RGBA_B] = back_color.b;	//set blue value
+				pixels2[i*RGBA_LEN+RGBA_A] = SHORT_MAX;	//set alpha
+				pixels2[i*4+3] = SHORT_MAX;
+		    }
+	    	//draw calibration point
+			calib_color.x = perfectPoints[calibrate-1].x;
+			calib_color.y = perfectPoints[calibrate-1].y;
+			draw_square(pixels2, DATA_WIDTH, DATA_HEIGHT, calib_color);
 			if (fingerup)
 			{
+				//set actual calibration points to the last finger that touched the display
 				actualPoints[calibrate-1].x = last_centroid.x;
 				actualPoints[calibrate-1].y = last_centroid.y;
-				calibrate++;
+				calibrate++;			//increment up to number of calibration points
 				//if done calibration
 				if (calibrate > 3)
 				{
+					//create calibration matrix
 					setCalibrationMatrix(&perfectPoints[0], &actualPoints[0], &calibMatrix);
 					//clear pixels
 					for (int i = 0; i < DATA_LEN * 4; ++i)
 					{
 						pixels2[i] = 0;
 					}
+					//done calibration
 					calibrate = 0;
 				}
 				fingerup = 0;
@@ -175,12 +252,10 @@ void *perform_DSP(void *args){
 					{
 						point2.x = centroids[i].x;
 						point2.y = centroids[i].y;
-						getDisplayPoint(&point1, &point2, &calibMatrix) ;
-						//printf("cent: %f %f\n", centroids[i].y, centroids[i].x);
-						//int val = 352*(int)centroids[i].y+(int)centroids[i].x;
+						getDisplayPoint(&point1, &point2, &calibMatrix);
 						finger_colors[0].x = point1.x;
 						finger_colors[0].y = point1.y;
-						draw_circle(pixels2, DATA_WIDTH, DATA_HEIGHT, finger_colors[0]);
+						draw_square(pixels2, DATA_WIDTH, DATA_HEIGHT, finger_colors[0]);
 					}
 				}
 		    }
@@ -189,62 +264,74 @@ void *perform_DSP(void *args){
 	return NULL;
 }
 
-//Recreate textures
+//* Function: Setup Textures
+//* Description: creates a texture using output pixels generated from another
+//thread (pixels2). Then it stores this into a texture.
+//* Input: nothing
+//* Returns: nothing
 void setup_textures(){
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, texture[1]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glEnable(GL_TEXTURE_2D);					//enable 2d texturing
+	glBindTexture(GL_TEXTURE_2D, texture[1]);	//bind the global texture variable to our texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);	//set magnification filter
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);	//set minification filter
+	//assign pixels to texture in RGBA format
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA4, DATA_WIDTH, DATA_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, pixels2);
 }
 
-//GLFW Window Error Callback function
+//* Function: Error Callback
+//* Description: Callback if GLFW messed up. Copied from first GLFW tutorial.
+//* Input: nothing
+//* Returns: nothing
 void error_callback(int error, const char* description)
 {
     fputs(description, stderr);
 }
-//GLFW Callback for close button on window
+
+//* Function: Key Callback
+//* Description: Callback if GLFW detects a window close or escape button. 
+//Copied from first GLFW tutorial.
+//* Input: nothing
+//* Returns: nothing
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
+        glfwSetWindowShouldClose(window, GL_TRUE);	//close program
 }
 
+//* Function: Main
+//* Description: Displays a drawing application using a touchscreen as input
+//and draws pixels to the screen according to the user. Uses the DE2 through
+//a socket server to do some of the DSP.
+//* Input: nothing
+//* Returns: 0 or error code
 int main(int argc, char const *argv[])
 {
-	//Init DE2
-	de2_init();
 	//Init GLFW
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
 	//set error callback
 	glfwSetErrorCallback(error_callback);
-	//get all screens
-	int count;
-	GLFWmonitor** monitors = glfwGetMonitors(&count);
-	//get size of last screen
-	int widthMM, heightMM;
-	glfwGetMonitorPhysicalSize(monitors[count-1], &widthMM, &heightMM);
-	//make fullscreen window from last monitor
-	GLFWwindow* window;
-	if (monitors != NULL)
-	{
-		window = glfwCreateWindow(640, 480, "Webcam DSP", NULL, NULL);
-	}else{
-		window = glfwCreateWindow(640, 480, "Webcam DSP", NULL, NULL);
-	}
+
+	//make GLFW window
+	GLFWwindow* window = glfwCreateWindow(640, 480, "Webcam DSP", NULL, NULL);
 	if (!window)
 	{
 	    glfwTerminate();
 	    exit(EXIT_FAILURE);
 	}
 	glfwMakeContextCurrent(window);
+	//set callback for keys and buttons on window
+	glfwSetKeyCallback(window, key_callback);
 
 	float ratio;
 	int width, height;
 
-	//make dsp thread
-	dsp_running = 1;
+	//Init DE2
+	de2_init();
+
+	//bool flag for dsp thread. When 0, the thread
+	//will exit, otherwise it will continue running in a loop
+	dsp_running = BOOL_TRUE;
 	pthread_create(&dsp_thread, NULL, perform_DSP, NULL);
 
 	//generate texture
@@ -269,25 +356,21 @@ int main(int argc, char const *argv[])
 		setup_textures();
 
 		//Draw Processed Data
-		//glEnable(GL_TEXTURE_2D);
-		//glBindTexture(GL_TEXTURE_2D, texture[1]);
-		glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex3f( -ratio, 1.0f, 0.0f);
-			glTexCoord2f(1.0f, 0.0f); glVertex3f( ratio, 1.0f, 0.0);
-			glTexCoord2f(1.0f, 1.0f); glVertex3f( ratio,-1.0f, 0.0);
-			glTexCoord2f(0.0f, 1.0f); glVertex3f( -ratio, -1.0f, 0.0);
+		glBegin(GL_QUADS);	//draw quads
+			glTexCoord2f(TEX_TOP_LEFT); glVertex3f( -ratio, 1.0f, 0.0f);		//top left vertex
+			glTexCoord2f(TEX_TOP_RIGHT); glVertex3f( ratio, 1.0f, 0.0);			//top right vertex
+			glTexCoord2f(TEX_BOT_RIGHT); glVertex3f( ratio,-1.0f, 0.0);			//bottom right vertex
+			glTexCoord2f(TEX_BOT_LEFT); glVertex3f( -ratio, -1.0f, 0.0);		//bottom left vertex
 		glEnd();
-		//glDisable(GL_TEXTURE_2D);
-
-		glfwSetKeyCallback(window, key_callback);
 
 	    glfwSwapBuffers(window);
 	    glfwPollEvents();
 	}
-	dsp_running = 0;
+	//kill dsp
+	dsp_running = BOOL_FALSE;
 	pthread_join(dsp_thread, NULL);
 	de2_close();
-
+	//kill GLFW
 	glfwDestroyWindow(window);
 	glfwTerminate();
 	printf("done\n");

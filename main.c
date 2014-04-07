@@ -28,7 +28,8 @@
 
 #include "dsp.h"
 #include "calibrate.h"
-#include "finger.h"
+//---------DEPRECATED--------------
+//#include "finger.h"
 
 //Size of camera image
 #define DATA_WIDTH	352
@@ -521,7 +522,6 @@ int main(int argc, char const *argv[])
 			glTexCoord2f(TEX_BOT_RIGHT); glVertex3f( ratio,-1.0f, 0.0);			//bottom right vertex
 			glTexCoord2f(TEX_BOT_LEFT); glVertex3f( -ratio, -1.0f, 0.0);		//bottom left vertex
 		glEnd();
-		//glDisable(GL_TEXTURE_2D);
 
 	    glfwSwapBuffers(window);		//swap the buffers and effectively display the new image
 	    glfwPollEvents();				//see if anything happened
